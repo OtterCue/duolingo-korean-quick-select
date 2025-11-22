@@ -306,6 +306,22 @@ class DuolingoKoreanQuickSelect {
       return;
     }
 
+    // Enter: 정확히 일치하는 단어가 있으면 선택, 없으면 기본 동작(제출)
+    if (key === 'Enter') {
+      const exactMatchBtn = document.querySelector('.korean-quick-select-exact-match');
+      if (exactMatchBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        console.log('↵ Enter - 단어 선택:', exactMatchBtn.textContent);
+        exactMatchBtn.click();
+        this.resetHighlight();
+        return;
+      }
+      // 일치하는 단어가 없으면 통과 -> 듀오링고가 '확인' 버튼 누름
+      return;
+    }
+
     // Backspace: 한 글자 삭제 또는 선택된 단어 삭제
     if (key === 'Backspace' || key === 'Delete') {
       if (this.currentInput !== '') {

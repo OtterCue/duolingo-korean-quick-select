@@ -392,6 +392,38 @@
         }
 
         window.addEventListener('keydown', function (event) {
+            // Enter Key Simulation
+            if (event.key === 'Enter') {
+                const exactMatchBtn = document.querySelector('.korean-quick-select-exact-match');
+                if (exactMatchBtn) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    console.log('↵ Enter - 단어 선택 (시뮬레이션):', exactMatchBtn.textContent);
+                    exactMatchBtn.click();
+                    simulatedInput = '';
+                    updateInputDisplay(simulatedInput);
+                    updateHighlight();
+                    return;
+                } else {
+                    console.log('↵ Enter - 기본 동작 (제출 시뮬레이션)');
+                    // 실제 듀오링고에서는 여기서 제출이 일어남
+                    const feedback = document.createElement('div');
+                    feedback.textContent = '🚀 정답 제출 (기본 동작)';
+                    feedback.style.position = 'fixed';
+                    feedback.style.top = '50%';
+                    feedback.style.left = '50%';
+                    feedback.style.transform = 'translate(-50%, -50%)';
+                    feedback.style.background = 'rgba(0,0,0,0.8)';
+                    feedback.style.color = 'white';
+                    feedback.style.padding = '20px';
+                    feedback.style.borderRadius = '10px';
+                    feedback.style.zIndex = '10000';
+                    document.body.appendChild(feedback);
+                    setTimeout(() => feedback.remove(), 1000);
+                }
+                return;
+            }
+
             if (event.key === 'Escape') {
                 simulatedInput = '';
                 updateInputDisplay(simulatedInput);
