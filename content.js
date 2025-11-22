@@ -116,6 +116,46 @@ class DuolingoKoreanQuickSelect {
       lastInput: ''
     };
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ⚙️ 키 바인딩 설정 (커스터마이징 가능)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    this.keyBindings = {
+      // 글로벌 단축키
+      global: {
+        escape: 'Escape',
+        backspace: 'Backspace',
+        delete: 'Delete'
+      },
+
+      // 오디오 단축키
+      audio: {
+        normal: '1',    // 일반 속도
+        slow: '2'       // 느린 속도
+      },
+
+      // Match 챌린지 (짝짓기)
+      match: {
+        buttons: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+        alternates: {
+          'q': 5, 'w': 6, 'e': 7, 'r': 8, 't': 9
+        }
+      },
+
+      // Listen Match 챌린지 (듣기 짝짓기)
+      listenMatch: {
+        buttons: ['1', '2', '3', '4', '5', '6', '7', '8'],
+        alternates: {
+          'q': 4, 'w': 5, 'e': 6, 'r': 7
+        }
+      },
+
+      // 한글 입력
+      korean: {
+        enter: 'Enter',
+        enabled: true
+      }
+    };
+
     console.log('🎯 Duolingo Korean Quick Select 초기화 중...');
     console.log('💡 하이브리드 매칭 모드 (초성 + 자모)');
 
@@ -267,13 +307,13 @@ class DuolingoKoreanQuickSelect {
     const wasActive = this.isActive;
 
     if (wordBank) {
-      const koreanButtons = this.getWordButtons();
-      this.isActive = koreanButtons.length > 0;
+      const buttons = this.getWordButtons();
+      this.isActive = buttons.length > 0;
 
       if (wasActive !== this.isActive) {
         if (this.isActive) {
-          console.log('✅ 단어 은행 발견! 한글 빠른 선택 활성화됨');
-          console.log(`📝 한글 버튼 ${koreanButtons.length}개 발견`);
+          console.log('✅ 단어 은행 발견! 빠른 선택 활성화됨');
+          console.log(`📝 버튼 ${buttons.length}개 발견`);
         }
       }
     } else {
@@ -284,184 +324,235 @@ class DuolingoKoreanQuickSelect {
     }
   }
 
+  /**
+   * 키보드 이벤트 핸들러 (메인 라우터)
+   * @param {Event} event - 키보드 이벤트
+   */
   handleKeyDown(event) {
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 우선순위 0: 입력 필드 체크 (공통)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-    if (activeTag === 'input' || activeTag === 'textarea' || document.activeElement.isContentEditable) {
-      return;
-    }
+    // 입력 필드 체크
+    if (this.isInInputField()) return;
 
     const key = event.key;
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 우선순위 1: 글로벌 단축키 (언어 무관, 모든 챌린지)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 우선순위 1: 글로벌 단축키 (ESC)
+    if (this.handleGlobalShortcuts(event, key)) return;
 
+    // 우선순위 2: 오디오 단축키 (1, 2번) - 언어 무관
+    if (this.handleAudioShortcuts(event, key)) return;
+
+    // 우선순위 3: 챌린지별 단축키 (Match, Listen Match)
+    if (this.handleChallengeShortcuts(event, key)) return;
+
+    // 우선순위 4: 한글 입력 (word-bank 필요)
+    if (this.isActive) {
+      this.handleKoreanInput(event, key);
+    }
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🛠️ 유틸리티 메서드
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /**
+   * 입력 필드에 포커스가 있는지 확인
+   * @returns {boolean} 입력 필드에 포커스가 있으면 true
+   */
+  isInInputField() {
+    const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+    return activeTag === 'input' || activeTag === 'textarea' || document.activeElement.isContentEditable;
+  }
+
+  /**
+   * 이벤트 전파 차단
+   * @param {Event} event - 키보드 이벤트
+   */
+  preventEventPropagation(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+  }
+
+  /**
+   * 현재 챌린지 타입 감지
+   * @returns {string} 챌린지 타입 ('listenTap', 'match', 'listenMatch', 'unknown')
+   */
+  detectChallengeType() {
+    if (document.querySelector('[data-test*="challenge-orderTapComplete"]')) return 'orderTapComplete';
+    if (document.querySelector('[data-test*="challenge-listenTap"]')) return 'listenTap';
+    if (document.querySelector('[data-test*="challenge-match"]')) return 'match';
+    if (document.querySelector('[data-test*="challenge-listenMatch"]')) return 'listenMatch';
+    return 'unknown';
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🎯 핸들러 메서드 (우선순위 순)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /**
+   * 글로벌 단축키 처리 (ESC)
+   * @param {Event} event - 키보드 이벤트
+   * @param {string} key - 입력된 키
+   * @returns {boolean} 처리했으면 true
+   */
+  handleGlobalShortcuts(event, key) {
     // ESC: 초기화
-    if (key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
+    if (key === this.keyBindings.global.escape) {
+      this.preventEventPropagation(event);
       console.log('🔄 ESC - 초기화');
       this.resetHighlight();
-      return;
+      return true;
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 우선순위 2: 오디오 단축키 (언어 무관, 듣기 챌린지)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    return false;
+  }
 
+  /**
+   * 오디오 단축키 처리 (1, 2번)
+   * @param {Event} event - 키보드 이벤트
+   * @param {string} key - 입력된 키
+   * @returns {boolean} 처리했으면 true
+   */
+  handleAudioShortcuts(event, key) {
     // 오디오 단축키 (1: 일반, 2: 느림)
-    if (key === '1' || key === '2') {
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('🎧 [오디오 단축키] 키 입력:', key === '1' ? '1번 (일반 속도)' : '2번 (느린 속도)');
+    if (key !== this.keyBindings.audio.normal && key !== this.keyBindings.audio.slow) return false;
 
-      // 듣기 문제 컨테이너 찾기 (클래스명이 바뀔 수 있으므로 data-test 속성 활용)
-      const challengeContainer = document.querySelector('[data-test*="challenge-listenTap"]');
+    const challengeContainer = document.querySelector('[data-test*="challenge-listenTap"]');
+    if (!challengeContainer) return false;
 
-      console.log('🔍 [1단계] 챌린지 컨테이너 찾기:', challengeContainer ? '✅ 발견' : '❌ 없음');
+    const allButtons = Array.from(challengeContainer.querySelectorAll('button'));
 
-      if (challengeContainer) {
-        // 컨테이너 내의 모든 버튼 수집
-        const allButtons = Array.from(challengeContainer.querySelectorAll('button'));
-        console.log('🔍 [2단계] 전체 버튼 개수:', allButtons.length);
+    // 제외할 버튼들 (단어 은행, 하단 버튼 등)
+    const audioButtons = allButtons.filter(btn => {
+      if (btn.closest('[data-test="word-bank"]')) return false;
+      if (btn.closest('[data-test="player-next"]') || btn.closest('[data-test="player-skip"]')) return false;
+      if (btn.closest('[data-test="quit-button"]')) return false;
+      if (btn.getAttribute('data-test') && btn.getAttribute('data-test').includes('challenge-tap-token')) return false;
+      return true;
+    });
 
-        // 제외할 버튼들 (단어 은행, 하단 버튼 등)
-        const audioButtons = allButtons.filter(btn => {
-          // 단어 은행 내부 버튼 제외
-          if (btn.closest('[data-test="word-bank"]')) return false;
-          // 하단 스킵/확인 버튼 제외
-          if (btn.closest('[data-test="player-next"]') || btn.closest('[data-test="player-skip"]')) return false;
-          // 종료 버튼 제외
-          if (btn.closest('[data-test="quit-button"]')) return false;
-          // 탭 토큰(정답 영역에 있는 것들) 제외 - 안전장치
-          if (btn.getAttribute('data-test') && btn.getAttribute('data-test').includes('challenge-tap-token')) return false;
-
-          return true;
-        });
-
-        console.log('🔍 [3단계] 필터링 후 오디오 버튼 개수:', audioButtons.length);
-
-        // 각 버튼 정보 출력
-        audioButtons.forEach((btn, index) => {
-          const btnText = btn.textContent.trim() || '(텍스트 없음)';
-          const btnClass = btn.className;
-          const btnDataTest = btn.getAttribute('data-test') || '(data-test 없음)';
-          console.log(`  📌 버튼[${index}]:`, {
-            텍스트: btnText.substring(0, 50),
-            클래스: btnClass.substring(0, 80),
-            'data-test': btnDataTest
-          });
-        });
-
-        if (key === '1' && audioButtons[0]) {
-          console.log('✅ 1번 버튼 클릭 시도 (일반 속도)');
-          audioButtons[0].click();
-          event.preventDefault();
-          event.stopPropagation();
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        } else if (key === '2' && audioButtons[1]) {
-          console.log('✅ 2번 버튼 클릭 시도 (느린 속도)');
-          audioButtons[1].click();
-          event.preventDefault();
-          event.stopPropagation();
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        } else {
-          console.warn('❌ 버튼을 찾을 수 없음:', {
-            요청한_키: key,
-            필요한_버튼: key === '1' ? '버튼[0]' : '버튼[1]',
-            실제_버튼_개수: audioButtons.length
-          });
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        }
-        return;
-      } else {
-        console.warn('❌ 듣기 챌린지 컨테이너를 찾을 수 없음');
-        console.log('💡 현재 페이지에 듣기 문제가 없거나, data-test 속성이 변경되었을 수 있습니다.');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      }
+    if (key === this.keyBindings.audio.normal && audioButtons[0]) {
+      console.log('🔊 일반 속도 재생');
+      audioButtons[0].click();
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    } else if (key === this.keyBindings.audio.slow && audioButtons[1]) {
+      console.log('🐢 느린 속도 재생');
+      audioButtons[1].click();
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
     }
 
+    return false;
+  }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 우선순위 3: 챌린지별 단축키 (Match, Listen Match)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  /**
+   * 챌린지별 단축키 라우터
+   * @param {Event} event - 키보드 이벤트
+   * @param {string} key - 입력된 키
+   * @returns {boolean} 처리했으면 true
+   */
+  handleChallengeShortcuts(event, key) {
+    const challengeType = this.detectChallengeType();
 
-    // 짝짓기 문제 (Match Challenge)
+    switch (challengeType) {
+      case 'match':
+        return this.handleMatchChallenge(event, key);
+      case 'listenMatch':
+        return this.handleListenMatchChallenge(event, key);
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Match 챌린지 단축키 처리
+   * @param {Event} event - 키보드 이벤트
+   * @param {string} key - 입력된 키
+   * @returns {boolean} 처리했으면 true
+   */
+  handleMatchChallenge(event, key) {
     const matchContainer = document.querySelector('[data-test*="challenge-match"]');
-    if (matchContainer) {
-      const buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+    if (!matchContainer) return false;
 
-      // 키 매핑 테이블
-      const keyMap = {
-        '1': 0, '2': 1, '3': 2, '4': 3, '5': 4,
-        '6': 5, '7': 6, '8': 7, '9': 8, '0': 9,
-        'q': 5, 'w': 6, 'e': 7, 'r': 8, 't': 9  // 편의성 키
-      };
+    const buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
 
-      if (keyMap.hasOwnProperty(key.toLowerCase())) {
-        const index = keyMap[key.toLowerCase()];
-        if (buttons[index]) {
-          console.log(`🔗 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
-          buttons[index].click();
+    // 키 매핑 테이블 (keyBindings에서 생성)
+    const keyMap = {};
+    this.keyBindings.match.buttons.forEach((key, index) => {
+      keyMap[key] = index;
+    });
+    Object.assign(keyMap, this.keyBindings.match.alternates);
 
-          // 시각적 피드백 (선택 효과)
-          buttons[index].style.transform = 'scale(0.95)';
-          setTimeout(() => buttons[index].style.transform = 'scale(1)', 100);
+    if (keyMap.hasOwnProperty(key.toLowerCase())) {
+      const index = keyMap[key.toLowerCase()];
+      if (buttons[index]) {
+        console.log(`🔗 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
+        buttons[index].click();
 
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-      }
-    }
+        // 시각적 피드백
+        buttons[index].style.transform = 'scale(0.95)';
+        setTimeout(() => buttons[index].style.transform = 'scale(1)', 100);
 
-
-    // 듣기 짝짓기 문제 (Listen Match Challenge)
-    const listenMatchContainer = document.querySelector('[data-test*="challenge-listenMatch"]');
-    if (listenMatchContainer) {
-      const buttons = Array.from(listenMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
-
-      // 키 매핑 테이블 (8개 버튼 기준)
-      const keyMap = {
-        '1': 0, '2': 1, '3': 2, '4': 3,
-        '5': 4, '6': 5, '7': 6, '8': 7,
-        'q': 4, 'w': 5, 'e': 6, 'r': 7  // 편의성 키
-      };
-
-      if (keyMap.hasOwnProperty(key.toLowerCase())) {
-        const index = keyMap[key.toLowerCase()];
-        if (buttons[index]) {
-          console.log(`🎧🔗 듣기 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
-          buttons[index].click();
-
-          // 시각적 피드백
-          buttons[index].style.transform = 'scale(0.95)';
-          setTimeout(() => buttons[index].style.transform = 'scale(1)', 100);
-
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-      }
-    }
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 우선순위 4: 한글 입력 (word-bank 필요)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    // 한글 단어 선택 기능은 word-bank가 있고 한글 버튼이 있을 때만 작동
-    if (!this.isActive) return;
-
-    // Enter: 정확히 일치하는 단어가 있으면 선택, 없으면 기본 동작(제출)
-    if (key === 'Enter') {
-      const exactMatchBtn = document.querySelector('.korean-quick-select-exact-match');
-      if (exactMatchBtn) {
         event.preventDefault();
         event.stopPropagation();
-        event.stopImmediatePropagation();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Listen Match 챌린지 단축키 처리
+   * @param {Event} event - 키보드 이벤트
+   * @param {string} key - 입력된 키
+   * @returns {boolean} 처리했으면 true
+   */
+  handleListenMatchChallenge(event, key) {
+    const listenMatchContainer = document.querySelector('[data-test*="challenge-listenMatch"]');
+    if (!listenMatchContainer) return false;
+
+    const buttons = Array.from(listenMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+
+    // 키 매핑 테이블 (keyBindings에서 생성)
+    const keyMap = {};
+    this.keyBindings.listenMatch.buttons.forEach((key, index) => {
+      keyMap[key] = index;
+    });
+    Object.assign(keyMap, this.keyBindings.listenMatch.alternates);
+
+    if (keyMap.hasOwnProperty(key.toLowerCase())) {
+      const index = keyMap[key.toLowerCase()];
+      if (buttons[index]) {
+        console.log(`🎧🔗 듣기 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
+        buttons[index].click();
+
+        // 시각적 피드백
+        buttons[index].style.transform = 'scale(0.95)';
+        setTimeout(() => buttons[index].style.transform = 'scale(1)', 100);
+
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 한글 입력 처리 (Enter, Backspace, 자모 입력)
+   * @param {Event} event - 키보드 이벤트
+   * @param {string} key - 입력된 키
+   */
+  handleKoreanInput(event, key) {
+    // Enter: 정확히 일치하는 단어가 있으면 선택
+    if (key === this.keyBindings.korean.enter) {
+      const exactMatchBtn = document.querySelector('.korean-quick-select-exact-match');
+      if (exactMatchBtn) {
+        this.preventEventPropagation(event);
         console.log('↵ Enter - 단어 선택:', exactMatchBtn.textContent);
         exactMatchBtn.click();
         this.resetHighlight();
@@ -474,9 +565,7 @@ class DuolingoKoreanQuickSelect {
     // Backspace: 한 글자 삭제 또는 선택된 단어 삭제
     if (key === 'Backspace' || key === 'Delete') {
       if (this.currentInput !== '') {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
+        this.preventEventPropagation(event);
         this.currentInput = this.currentInput.slice(0, -1);
         console.log(`⬅️ Backspace - 현재: "${this.currentInput}"`);
         this.updateHighlight();
@@ -485,13 +574,9 @@ class DuolingoKoreanQuickSelect {
         // 입력값이 없을 때 Backspace를 누르면 이미 선택된 단어 삭제
         const placedButtons = this.getPlacedButtons();
         if (placedButtons.length > 0) {
-          event.preventDefault();
-          event.stopPropagation();
-          event.stopImmediatePropagation();
-
+          this.preventEventPropagation(event);
           const lastButton = placedButtons[placedButtons.length - 1];
           console.log(`🗑️ 선택된 단어 삭제: "${lastButton.textContent.trim()}"`);
-
           lastButton.click();
           lastButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         }
@@ -501,8 +586,16 @@ class DuolingoKoreanQuickSelect {
 
     let nextInput = null;
 
+    // ✅ 치명적 수정: orderTapComplete에서는 알파벳을 KEY_MAP보다 먼저 처리
+    const challengeType = this.detectChallengeType();
+    const isOrderTapComplete = challengeType === 'orderTapComplete';
+
+    if (isOrderTapComplete && /^[a-zA-Z]$/.test(key)) {
+      // orderTapComplete + 알파벳 → 그대로 사용 (KEY_MAP 변환 안 함)
+      nextInput = this.currentInput + key;
+    }
     // 영어 키 → 한글 자모 변환
-    if (KEY_MAP[key]) {
+    else if (KEY_MAP[key]) {
       nextInput = this.currentInput + KEY_MAP[key];
     }
     // 한글 자모 직접 입력
@@ -511,27 +604,31 @@ class DuolingoKoreanQuickSelect {
     }
 
     if (nextInput) {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
+      this.preventEventPropagation(event);
 
-      // 유효성 검사: 입력했을 때 매칭되는 단어가 있는지 확인 (초성 또는 자모 분해)
+      // ✅ 치명적 수정: 유효성 검사 - 영어 매칭 추가
       const buttons = this.getWordButtons();
       const hasMatch = buttons.some(button => {
         const text = button.textContent.trim();
-        const chosung = getChosung(text);
-        const disassembled = getDisassembled(text);
+        const lang = button.getAttribute('lang');
+        const hasKorean = /[가-힣]/.test(text);
 
-        return chosung.startsWith(nextInput) || disassembled.startsWith(nextInput);
+        if (lang === 'ko' || hasKorean) {
+          // 한글 단어: 초성/자모 매칭
+          const chosung = getChosung(text);
+          const disassembled = getDisassembled(text);
+          return chosung.startsWith(nextInput) || disassembled.startsWith(nextInput);
+        } else if (isOrderTapComplete && lang === 'en') {
+          // 영어 단어: 대소문자 무시하고 prefix 매칭
+          return text.toLowerCase().startsWith(nextInput.toLowerCase());
+        }
+        return false;
       });
 
       if (hasMatch) {
         this.currentInput = nextInput;
-
-        // 통계 업데이트
         this.stats.totalInputs++;
         this.stats.lastInput = key;
-
         console.log(`✅ 입력 성공! 현재: "${this.currentInput}"`);
         this.updateHighlight();
         this.updateInputDisplay();
@@ -574,20 +671,51 @@ class DuolingoKoreanQuickSelect {
       return;
     }
 
+    const challengeType = this.detectChallengeType();
+    const isOrderTapComplete = challengeType === 'orderTapComplete';
     const matchedButtons = [];
 
     buttons.forEach(button => {
       const text = button.textContent.trim();
-      const chosung = getChosung(text);
-      const disassembled = getDisassembled(text);
+      const lang = button.getAttribute('lang');
+      const hasKorean = /[가-힣]/.test(text);
 
-      // 초성 매칭 또는 자모 분해 매칭 확인
-      if (chosung.startsWith(this.currentInput) || disassembled.startsWith(this.currentInput)) {
+      let isMatch = false;
+      let isExactMatch = false;
+
+      if (lang === 'ko' || hasKorean) {
+        // 한글 매칭: 기존 로직 (초성 또는 자모 분해)
+        const chosung = getChosung(text);
+        const disassembled = getDisassembled(text);
+
+        if (chosung.startsWith(this.currentInput) || disassembled.startsWith(this.currentInput)) {
+          isMatch = true;
+
+          // 정확히 일치하는지 확인 (초성 전체 일치 또는 자모 전체 일치)
+          if (chosung === this.currentInput || disassembled === this.currentInput) {
+            isExactMatch = true;
+          }
+        }
+      } else if (isOrderTapComplete && lang === 'en') {
+        // 영어 매칭: 대소문자 무시하고 prefix 매칭
+        const lowerText = text.toLowerCase();
+        const lowerInput = this.currentInput.toLowerCase();
+
+        if (lowerText.startsWith(lowerInput)) {
+          isMatch = true;
+
+          // 정확히 일치
+          if (lowerText === lowerInput) {
+            isExactMatch = true;
+          }
+        }
+      }
+
+      if (isMatch) {
         matchedButtons.push(button);
         button.classList.add('korean-quick-select-highlight');
 
-        // 정확히 일치하는지 확인 (초성 전체 일치 또는 자모 전체 일치)
-        if (chosung === this.currentInput || disassembled === this.currentInput) {
+        if (isExactMatch) {
           button.classList.remove('korean-quick-select-highlight');
           button.classList.add('korean-quick-select-exact-match');
         }
@@ -646,7 +774,10 @@ class DuolingoKoreanQuickSelect {
       buttons = document.querySelectorAll('[data-test*="challenge-tap-token"]');
     }
 
-    const koreanButtons = Array.from(buttons).filter(button => {
+    const challengeType = this.detectChallengeType();
+    const isOrderTapComplete = challengeType === 'orderTapComplete';
+
+    const validButtons = Array.from(buttons).filter(button => {
       // 화면에 보이지 않는 버튼 제외 (중복 감지 방지)
       if (button.offsetParent === null) return false;
 
@@ -667,11 +798,22 @@ class DuolingoKoreanQuickSelect {
       const lang = button.getAttribute('lang');
       const text = button.textContent;
       const hasKorean = /[가-힣]/.test(text);
+      const hasEnglish = /[a-zA-Z]/.test(text);
 
-      return lang === 'ko' || hasKorean;
+      // 한글 버튼은 항상 포함
+      if (lang === 'ko' || hasKorean) {
+        return true;
+      }
+
+      // orderTapComplete에서만 영어 버튼 포함
+      if (isOrderTapComplete && lang === 'en' && hasEnglish) {
+        return true;
+      }
+
+      return false;
     });
 
-    return koreanButtons;
+    return validButtons;
   }
 
   // 정답 영역에 놓인 버튼들 찾기
