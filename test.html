@@ -199,6 +199,22 @@
             현재 입력: <span id="input-display">없음</span>
         </div>
 
+        <!-- 듣기 문제 시뮬레이션 -->
+        <div data-test="challenge challenge-listenTap"
+            style="margin: 20px 0; padding: 20px; border: 2px dashed #ccc; border-radius: 10px;">
+            <h3>🎧 듣기 문제 시뮬레이션 (단축키 1, 2 테스트)</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button id="audio-normal"
+                    style="padding: 10px 20px; background: #1cb0f6; color: white; border: none; border-radius: 10px; cursor: pointer;">
+                    🔊 일반 속도 (1)
+                </button>
+                <button id="audio-slow"
+                    style="padding: 10px 20px; background: #1cb0f6; color: white; border: none; border-radius: 10px; cursor: pointer;">
+                    🐢 느린 속도 (2)
+                </button>
+            </div>
+        </div>
+
         <h2>문제: "팀은 팀을 팀과 톰 나도"</h2>
 
         <div class="answer-area" id="answer-area">
@@ -422,6 +438,34 @@
                     setTimeout(() => feedback.remove(), 1000);
                 }
                 return;
+            }
+
+            // Audio Shortcuts Simulation
+            if (event.key === '1' || event.key === '2') {
+                const challengeContainer = document.querySelector('[data-test*="challenge-listenTap"]');
+                if (challengeContainer) {
+                    const allButtons = Array.from(challengeContainer.querySelectorAll('button'));
+                    const audioButtons = allButtons.filter(btn => {
+                        if (btn.closest('[data-test="word-bank"]')) return false;
+                        return true;
+                    });
+
+                    if (event.key === '1' && audioButtons[0]) {
+                        console.log('🔊 일반 속도 재생 (시뮬레이션)');
+                        audioButtons[0].click();
+                        // 시각적 피드백
+                        audioButtons[0].style.transform = 'scale(0.95)';
+                        setTimeout(() => audioButtons[0].style.transform = 'scale(1)', 100);
+                        event.preventDefault();
+                    } else if (event.key === '2' && audioButtons[1]) {
+                        console.log('🐢 느린 속도 재생 (시뮬레이션)');
+                        audioButtons[1].click();
+                        audioButtons[1].style.transform = 'scale(0.95)';
+                        setTimeout(() => audioButtons[1].style.transform = 'scale(1)', 100);
+                        event.preventDefault();
+                    }
+                    return;
+                }
             }
 
             if (event.key === 'Escape') {

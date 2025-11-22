@@ -322,6 +322,44 @@ class DuolingoKoreanQuickSelect {
       return;
     }
 
+    // 오디오 단축키 (1: 일반, 2: 느림)
+    if (key === '1' || key === '2') {
+      // 듣기 문제 컨테이너 찾기 (클래스명이 바뀔 수 있으므로 data-test 속성 활용)
+      const challengeContainer = document.querySelector('[data-test*="challenge-listenTap"]');
+
+      if (challengeContainer) {
+        // 컨테이너 내의 모든 버튼 수집
+        const allButtons = Array.from(challengeContainer.querySelectorAll('button'));
+
+        // 제외할 버튼들 (단어 은행, 하단 버튼 등)
+        const audioButtons = allButtons.filter(btn => {
+          // 단어 은행 내부 버튼 제외
+          if (btn.closest('[data-test="word-bank"]')) return false;
+          // 하단 스킵/확인 버튼 제외
+          if (btn.closest('[data-test="player-next"]') || btn.closest('[data-test="player-skip"]')) return false;
+          // 종료 버튼 제외
+          if (btn.closest('[data-test="quit-button"]')) return false;
+          // 탭 토큰(정답 영역에 있는 것들) 제외 - 안전장치
+          if (btn.getAttribute('data-test') && btn.getAttribute('data-test').includes('challenge-tap-token')) return false;
+
+          return true;
+        });
+
+        if (key === '1' && audioButtons[0]) {
+          console.log('🔊 일반 속도 재생');
+          audioButtons[0].click();
+          event.preventDefault();
+          event.stopPropagation();
+        } else if (key === '2' && audioButtons[1]) {
+          console.log('🐢 느린 속도 재생');
+          audioButtons[1].click();
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+    }
+
     // Backspace: 한 글자 삭제 또는 선택된 단어 삭제
     if (key === 'Backspace' || key === 'Delete') {
       if (this.currentInput !== '') {
