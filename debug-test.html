@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>키보드 이벤트 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        
+        .test-area {
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f5f5f5;
+        }
+        
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 키보드 이벤트 디버깅</h1>
+    
+    <div class="status" id="status">
+        확장 프로그램 상태 확인 중...
+    </div>
+    
+    <div class="test-area">
+        <h2>테스트 영역</h2>
+        <p>이 영역에서 초성을 입력해보세요: ㄱ, ㄴ, ㄷ, ...</p>
+        
+        <div data-test="word-bank">
+            <button data-test="우리는-challenge-tap-token" lang="ko">우리는</button>
+            <button data-test="여기-challenge-tap-token" lang="ko">여기</button>
+            <button data-test="같이-challenge-tap-token" lang="ko">같이</button>
+            <button data-test="있어요-challenge-tap-token" lang="ko">있어요</button>
+        </div>
+    </div>
+    
+    <button onclick="clearLog()">로그 지우기</button>
+    <button onclick="location.reload()">새로고침</button>
+    
+    <div class="log" id="log">
+        <div class="log-entry">콘솔 로그가 여기에 표시됩니다...</div>
+    </div>
+    
+    <script>
+        const logDiv = document.getElementById('log');
+        const statusDiv = document.getElementById('status');
+        
+        // 콘솔 로그 가로채기
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog(args.join(' '));
+        };
+        
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addLog('⚠️ ' + args.join(' '));
+        };
+        
+        const originalError = console.error;
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog('❌ ' + args.join(' '));
+        };
+        
+        function addLog(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            // 확장 프로그램 상태 업데이트
+            if (message.includes('활성화됨')) {
+                statusDiv.className = 'status active';
+                statusDiv.textContent = '✅ 확장 프로그램이 정상적으로 로드되었습니다!';
+            } else if (message.includes('단어 은행 발견')) {
+                statusDiv.className = 'status active';
+                statusDiv.textContent = '✅ 단어 은행이 감지되었습니다! 초성을 입력해보세요.';
+            }
+        }
+        
+        function clearLog() {
+            logDiv.innerHTML = '<div class="log-entry">로그가 지워졌습니다.</div>';
+        }
+        
+        // 키보드 이벤트 직접 감지
+        const CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+        
+        document.addEventListener('keydown', function(e) {
+            if (CHOSUNG_LIST.includes(e.key)) {
+                addLog(`📥 [테스트 페이지] 키 감지: "${e.key}"`);
+            }
+        }, true);
+        
+        // 버튼 클릭 감지
+        document.querySelectorAll('button[data-test*="challenge-tap-token"]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                addLog(`🖱️ 버튼 클릭됨: "${this.textContent}"`);
+                this.style.opacity = '0.5';
+            });
+        });
+        
+        setTimeout(() => {
+            if (!statusDiv.textContent.includes('✅')) {
+                statusDiv.className = 'status inactive';
+                statusDiv.textContent = '❌ 확장 프로그램이 로드되지 않았습니다. F12를 눌러 콘솔을 확인하세요.';
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

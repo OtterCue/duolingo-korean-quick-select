@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duolingo Korean Quick Select - 테스트</title>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f7f7f7;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #3c3c3c;
+            margin-bottom: 10px;
+        }
+
+        .instruction {
+            color: #777;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: #f0f9ff;
+            border-radius: 8px;
+            border-left: 4px solid #1cb0f6;
+        }
+
+        .answer-area {
+            min-height: 60px;
+            border-bottom: 2px solid #e5e5e5;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px;
+            align-items: center;
+        }
+
+        .word-bank {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 30px;
+            min-height: 100px;
+        }
+
+        button[data-test*="challenge-tap-token"] {
+            padding: 12px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            border: 2px solid #e5e5e5;
+            border-radius: 12px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.1s;
+            min-width: 80px;
+            position: relative;
+        }
+
+        button[aria-disabled="true"] {
+            background-color: #e5e5e5;
+            color: #afafaf;
+            border-color: transparent;
+            cursor: default;
+        }
+
+        button[data-test*="challenge-tap-token"]:not([aria-disabled="true"]):hover {
+            border-color: #1cb0f6;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .current-input {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 16px;
+        }
+
+        .shortcuts {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .kqs-error {
+            background: rgba(255, 82, 82, 0.95) !important;
+            color: white !important;
+            animation: shake 0.2s cubic-bezier(.36, .07, .19, .97) both;
+        }
+
+        .kqs-input-display-sim {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: rgba(28, 176, 246, 0.95);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 999999;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.1s ease;
+        }
+
+        .kqs-input-display-sim.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @keyframes shake {
+
+            10%,
+            90% {
+                transform: translate3d(-1px, 0, 0);
+            }
+
+            20%,
+            80% {
+                transform: translate3d(2px, 0, 0);
+            }
+
+            30%,
+            50%,
+            70% {
+                transform: translate3d(-4px, 0, 0);
+            }
+
+            40%,
+            60% {
+                transform: translate3d(4px, 0, 0);
+            }
+        }
+
+        /* --- 수정된 하이라이트 스타일 (content.js와 동일) --- */
+        /* 후보 (파란색) */
+        .korean-quick-select-highlight {
+            background-color: white !important;
+            color: #1cb0f6 !important;
+            border: 2px solid #1cb0f6 !important;
+            transition: all 0.1s ease;
+            transform: scale(1.02);
+            z-index: 10 !important;
+        }
+
+        .korean-quick-select-highlight * {
+            background-color: transparent !important;
+            color: #1cb0f6 !important;
+            text-shadow: none !important;
+        }
+
+        /* 확정 (초록색) */
+        .korean-quick-select-exact-match {
+            background-color: white !important;
+            color: #58cc02 !important;
+            border: 2px solid #58cc02 !important;
+            box-shadow: 0 0 0 2px #58cc02 !important;
+            transform: scale(1.05);
+            z-index: 11 !important;
+        }
+
+        .korean-quick-select-exact-match * {
+            background-color: transparent !important;
+            color: #58cc02 !important;
+            text-shadow: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🇰🇷 Duolingo Korean Quick Select 테스트</h1>
+
+        <div class="instruction">
+            <strong>테스트 목표:</strong> 글자가 무조건 잘 보여야 함.<br>
+            - 후보(여러 개): 흰 배경 + <strong>파란 글씨</strong> + 파란 테두리<br>
+            - 선택(한 개): 흰 배경 + <strong>초록 글씨</strong> + 초록 테두리
+        </div>
+
+        <div class="current-input">
+            현재 입력: <span id="input-display">없음</span>
+        </div>
+
+        <h2>문제: "팀은 팀을 팀과 톰 나도"</h2>
+
+        <div class="answer-area" id="answer-area">
+            <span style="color: #ccc; font-size: 14px;">(정답이 여기에 표시됩니다)</span>
+        </div>
+
+        <div class="word-bank" data-test="word-bank" id="word-bank">
+            <button data-test="팀은-challenge-tap-token" lang="ko" class="notranslate">팀은</button>
+            <button data-test="팀을-challenge-tap-token" lang="ko" class="notranslate">팀을</button>
+            <button data-test="팀과-challenge-tap-token" lang="ko" class="notranslate">팀과</button>
+
+            <!-- 유령 버튼 (빈 텍스트) -->
+            <button data-test="ghost-challenge-tap-token" lang="ko" class="notranslate"
+                style="width: 80px; height: 50px;"></button>
+
+            <button data-test="나도-challenge-tap-token" lang="ko" class="notranslate">나도</button>
+            <button data-test="톰-challenge-tap-token" lang="ko" class="notranslate">톰</button>
+        </div>
+
+        <div class="shortcuts">
+            <h3>💡 테스트 방법</h3>
+            <ol>
+                <li><code>xl</code> (티) 입력 → "팀은, 팀을, 팀과"가 <strong>파란 글씨</strong>로 표시됨.</li>
+                <li><code>xh</code> (토) 입력 → "톰"이 <strong>초록 글씨</strong>로 표시됨.</li>
+            </ol>
+        </div>
+    </div>
+
+    <div id="sim-popup" class="kqs-input-display-sim">
+        <div id="sim-text">대기 중...</div>
+        <div style="font-size: 11px; opacity: 0.8; margin-top: 5px;">초성 또는 자모 입력</div>
+    </div>
+
+    <script>
+        const inputDisplay = document.getElementById('input-display');
+        const inputDisplayContainer = document.querySelector('.current-input');
+        const answerArea = document.getElementById('answer-area');
+        const wordBank = document.getElementById('word-bank');
+        const simPopup = document.getElementById('sim-popup');
+        const simText = document.getElementById('sim-text');
+
+        function moveButton(button) {
+            if (button.getAttribute('aria-disabled') === 'true') return;
+            if (button.textContent.trim() === '') return;
+
+            if (wordBank.contains(button)) {
+                if (answerArea.querySelector('span')) answerArea.querySelector('span').remove();
+
+                const clone = button.cloneNode(true);
+                clone.removeAttribute('data-test');
+                clone.style.cursor = 'default';
+                clone.onclick = null;
+                answerArea.appendChild(clone);
+
+                button.setAttribute('aria-disabled', 'true');
+                button.classList.remove('korean-quick-select-exact-match');
+                button.classList.remove('korean-quick-select-highlight');
+            }
+        }
+
+        document.querySelectorAll('#word-bank button').forEach(btn => {
+            btn.addEventListener('click', () => moveButton(btn));
+        });
+
+        function updateInputDisplay(input) {
+            inputDisplay.textContent = input || '없음';
+            if (input) {
+                simText.textContent = input;
+                simPopup.classList.add('visible');
+            } else {
+                setTimeout(() => {
+                    simPopup.classList.remove('visible');
+                }, 1000);
+            }
+        }
+
+        function showError() {
+            inputDisplayContainer.classList.add('kqs-error');
+            simPopup.classList.add('kqs-error');
+            simPopup.classList.add('visible');
+            setTimeout(() => {
+                inputDisplayContainer.classList.remove('kqs-error');
+                simPopup.classList.remove('kqs-error');
+                if (!simulatedInput) simPopup.classList.remove('visible');
+            }, 200);
+        }
+
+        let simulatedInput = '';
+
+        const KEY_MAP = {
+            'q': 'ㅂ', 'Q': 'ㅃ', 'w': 'ㅈ', 'W': 'ㅉ', 'e': 'ㄷ', 'E': 'ㄸ', 'r': 'ㄱ', 'R': 'ㄲ', 't': 'ㅅ', 'T': 'ㅆ',
+            'a': 'ㅁ', 's': 'ㄴ', 'd': 'ㅇ', 'f': 'ㄹ', 'g': 'ㅎ',
+            'z': 'ㅋ', 'x': 'ㅌ', 'c': 'ㅊ', 'v': 'ㅍ',
+            'y': 'ㅛ', 'u': 'ㅕ', 'i': 'ㅑ', 'o': 'ㅐ', 'O': 'ㅒ', 'p': 'ㅔ', 'P': 'ㅖ',
+            'h': 'ㅗ', 'j': 'ㅓ', 'k': 'ㅏ', 'l': 'ㅣ', 'b': 'ㅠ', 'n': 'ㅜ', 'm': 'ㅡ'
+        };
+
+        const CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+        const JUNGSUNG_LIST = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'];
+        const COMPLEX_VOWELS = { 'ㅘ': 'ㅗㅏ', 'ㅙ': 'ㅗㅐ', 'ㅚ': 'ㅗㅣ', 'ㅝ': 'ㅜㅓ', 'ㅞ': 'ㅜㅔ', 'ㅟ': 'ㅜㅣ', 'ㅢ': 'ㅡㅣ' };
+        const HANGUL_START = 0xAC00;
+        const HANGUL_END = 0xD7A3;
+
+        function getChosung(text) {
+            let chosung = '';
+            for (let i = 0; i < text.length; i++) {
+                const code = text.charCodeAt(i);
+                if (code >= HANGUL_START && code <= HANGUL_END) {
+                    const chosungIndex = Math.floor((code - HANGUL_START) / 588);
+                    chosung += CHOSUNG_LIST[chosungIndex];
+                } else if (CHOSUNG_LIST.includes(text[i])) {
+                    chosung += text[i];
+                } else {
+                    chosung += text[i];
+                }
+            }
+            return chosung;
+        }
+
+        function getDisassembled(text) {
+            let result = '';
+            for (let i = 0; i < text.length; i++) {
+                const code = text.charCodeAt(i);
+                if (code >= HANGUL_START && code <= HANGUL_END) {
+                    const charCode = code - HANGUL_START;
+                    const chosungIndex = Math.floor(charCode / 588);
+                    const jungsungIndex = Math.floor((charCode % 588) / 28);
+
+                    result += CHOSUNG_LIST[chosungIndex];
+                    const vowel = JUNGSUNG_LIST[jungsungIndex];
+                    if (COMPLEX_VOWELS[vowel]) {
+                        result += COMPLEX_VOWELS[vowel];
+                    } else {
+                        result += vowel;
+                    }
+                } else {
+                    result += text[i];
+                }
+            }
+            return result;
+        }
+
+        function getWordButtons() {
+            const buttons = Array.from(wordBank.querySelectorAll('button'));
+            return buttons.filter(btn => {
+                const style = window.getComputedStyle(btn);
+                return btn.getAttribute('aria-disabled') !== 'true' &&
+                    btn.textContent.trim() !== '' &&
+                    style.opacity !== '0' &&
+                    style.visibility !== 'hidden';
+            });
+        }
+
+        function updateHighlight() {
+            document.querySelectorAll('.korean-quick-select-highlight, .korean-quick-select-exact-match').forEach(el => {
+                el.classList.remove('korean-quick-select-highlight', 'korean-quick-select-exact-match');
+            });
+
+            if (!simulatedInput) return;
+
+            const buttons = getWordButtons();
+            const matchedButtons = buttons.filter(button => {
+                const text = button.textContent.trim();
+                const chosung = getChosung(text);
+                const disassembled = getDisassembled(text);
+                return chosung.startsWith(simulatedInput) || disassembled.startsWith(simulatedInput);
+            });
+
+            if (matchedButtons.length > 0) {
+                const allMatchedTexts = new Set(matchedButtons.map(b => b.textContent.trim()));
+
+                if (allMatchedTexts.size === 1) {
+                    const target = matchedButtons[0];
+                    console.log('✨ 자동 선택 시도:', target.textContent.trim());
+                    matchedButtons.forEach(btn => btn.classList.add('korean-quick-select-exact-match'));
+                    target.click();
+                    simulatedInput = '';
+                    updateInputDisplay(simulatedInput);
+                    setTimeout(() => {
+                        matchedButtons.forEach(btn => btn.classList.remove('korean-quick-select-exact-match'));
+                    }, 200);
+                } else {
+                    matchedButtons.forEach(btn => btn.classList.add('korean-quick-select-highlight'));
+                }
+            } else {
+                console.log(`🚫 입력 거부: "${simulatedInput}"`);
+                showError();
+                simulatedInput = '';
+                updateInputDisplay(simulatedInput);
+            }
+        }
+
+        window.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                simulatedInput = '';
+                updateInputDisplay(simulatedInput);
+                updateHighlight();
+                return;
+            }
+
+            if (event.key === 'Backspace' || event.key === 'Delete') {
+                if (simulatedInput !== '') {
+                    simulatedInput = simulatedInput.slice(0, -1);
+                    updateInputDisplay(simulatedInput);
+                    updateHighlight();
+                }
+                return;
+            }
+
+            let nextInput = null;
+            if (KEY_MAP[event.key]) {
+                nextInput = simulatedInput + KEY_MAP[event.key];
+            } else if (CHOSUNG_LIST.includes(event.key) || JUNGSUNG_LIST.includes(event.key)) {
+                nextInput = simulatedInput + event.key;
+            }
+
+            if (nextInput) {
+                simulatedInput = nextInput;
+                updateInputDisplay(simulatedInput);
+                updateHighlight();
+            }
+        }, true);
+
+        console.log('테스트 페이지 로드 완료.');
+    </script>
+</body>
+
+</html>

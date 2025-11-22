@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Duolingo Korean Quick Select",
+  "version": "1.0.0",
+  "description": "듀오링고에서 한글 단어를 키보드로 빠르게 선택할 수 있습니다",
+  "permissions": [],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+    "default_title": "Duolingo Korean Quick Select"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.duolingo.com/*",
+        "https://*.duolingo.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

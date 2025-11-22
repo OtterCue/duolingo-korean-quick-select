@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duolingo Korean Quick Select</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            width: 350px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #58cc02 0%, #46a302 100%);
+            color: white;
+        }
+        
+        .container {
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .header .subtitle {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .status-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+        }
+        
+        .status-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .status-icon.active {
+            background: #58cc02;
+            box-shadow: 0 0 8px rgba(88, 204, 2, 0.5);
+        }
+        
+        .status-icon.inactive {
+            background: #e5e5e5;
+        }
+        
+        .status-text {
+            flex: 1;
+            font-size: 13px;
+        }
+        
+        .status-text strong {
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        
+        .input-monitor {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        
+        .input-monitor h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        
+        .input-display {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 50px;
+            font-family: 'Courier New', monospace;
+            font-size: 20px;
+            text-align: center;
+            color: #495057;
+            font-weight: bold;
+        }
+        
+        .input-display.empty {
+            color: #adb5bd;
+            font-size: 14px;
+            font-weight: normal;
+        }
+        
+        .stats {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        
+        .stats h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            color: #666;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        
+        .shortcuts {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 15px;
+            color: #333;
+            font-size: 12px;
+        }
+        
+        .shortcuts h3 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #1a1a1a;
+        }
+        
+        .shortcuts ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .shortcuts li {
+            padding: 4px 0;
+            color: #666;
+        }
+        
+        .shortcuts code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #495057;
+            font-weight: 600;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span>🇰🇷</span>
+                <span>Korean Quick Select</span>
+            </h1>
+            <div class="subtitle">듀오링고 한글 빠른 선택</div>
+        </div>
+        
+        <div class="status-card">
+            <div class="status-row">
+                <div class="status-icon" id="status-icon"></div>
+                <div class="status-text">
+                    <strong>상태:</strong> <span id="status-text">확인 중...</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="input-monitor">
+            <h3>⌨️ 현재 입력</h3>
+            <div class="input-display empty" id="input-display">초성을 입력해보세요</div>
+        </div>
+        
+        <div class="stats">
+            <h3>📊 통계</h3>
+            <div class="stat-item">
+                <span class="stat-label">총 입력 횟수</span>
+                <span class="stat-value" id="total-inputs">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">자동 선택 횟수</span>
+                <span class="stat-value" id="auto-selects">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">마지막 입력</span>
+                <span class="stat-value" id="last-input">없음</span>
+            </div>
+        </div>
+        
+        <div class="shortcuts">
+            <h3>⚡ 단축키</h3>
+            <ul>
+                <li><code>ㄱ~ㅎ</code> 초성 입력</li>
+                <li><code>Backspace</code> 지우기</li>
+                <li><code>ESC</code> 초기화</li>
+            </ul>
+        </div>
+        
+        <div class="footer">
+            v1.0.0 | Made with ❤️
+        </div>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
