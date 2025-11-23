@@ -329,21 +329,63 @@ class DuolingoKoreanQuickSelect {
    * @param {Event} event - 키보드 이벤트
    */
   handleKeyDown(event) {
-    // 입력 필드 체크
-    if (this.isInInputField()) return;
-
     const key = event.key;
 
-    // 우선순위 1: 글로벌 단축키 (ESC)
+    // 1. [최우선] Ctrl+1, Ctrl+2 오디오 단축키 (타이핑 중에도 동작)
+    // 🚨 브라우저 탭 전환 방지 (필수) 및 오디오 재생
+    if (event.ctrlKey && (key === '1' || key === '2')) {
+      event.preventDefault(); // 탭 전환 차단
+      event.stopPropagation();
+      this.handleAudioShortcuts(event, key);
+      return;
+    }
+
+    // 2. 입력 필드 체크
+    if (this.isInInputField()) return;
+
+    // 3. 글로벌 단축키 (ESC)
     if (this.handleGlobalShortcuts(event, key)) return;
 
-    // 우선순위 2: 오디오 단축키 (1, 2번) - 언어 무관
+    // [NEW] Backspace/Delete 전역 처리 (최우선 순위로 격상)
+    if (key === 'Backspace' || key === 'Delete') {
+      // 1) 입력 중인 글자가 있으면 지움
+      if (this.currentInput.length > 0) {
+        this.preventEventPropagation(event);
+        this.currentInput = this.currentInput.slice(0, -1);
+        console.log(`⬅️ Backspace - 현재: "${this.currentInput}"`);
+
+        // 🚨 중요: 지울 때는 자동 선택 방지 (allowAutoSelect = false)
+        this.updateHighlight(false);
+        this.updateInputDisplay();
+        return;
+      }
+
+      // 2) 입력 중인 글자가 없으면 -> 선택된 단어 삭제 (취소)
+      // (단어 은행이 활성화된 경우에만)
+      if (this.isActive) {
+        const placedButtons = this.getPlacedButtons();
+        if (placedButtons.length > 0) {
+          this.preventEventPropagation(event);
+          const lastButton = placedButtons[placedButtons.length - 1];
+          console.log(`🗑️ 선택된 단어 삭제: "${lastButton.textContent.trim()}"`);
+          lastButton.click();
+          lastButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          return;
+        }
+      }
+
+      // 아무것도 해당 안 되면 기본 동작 허용
+      return;
+    }
+
+    // 4. 일반 오디오 단축키 (1, 2) - 입력 필드 아닐 때만
+    // (Ctrl 키가 눌리지 않았을 때만 동작하도록 내부에서 체크함)
     if (this.handleAudioShortcuts(event, key)) return;
 
-    // 우선순위 3: 챌린지별 단축키 (Match, Listen Match)
+    // 5. 챌린지별 단축키 (Match, Listen Match)
     if (this.handleChallengeShortcuts(event, key)) return;
 
-    // 우선순위 4: 한글 입력 (word-bank 필요)
+    // 6. 한글 입력 (word-bank 필요)
     if (this.isActive) {
       this.handleKoreanInput(event, key);
     }
@@ -381,6 +423,11 @@ class DuolingoKoreanQuickSelect {
     if (document.querySelector('[data-test*="challenge-listenTap"]')) return 'listenTap';
     if (document.querySelector('[data-test*="challenge-match"]')) return 'match';
     if (document.querySelector('[data-test*="challenge-listenMatch"]')) return 'listenMatch';
+
+    // 타이핑이 필요한 챌린지 추가
+    if (document.querySelector('[data-test*="challenge-listen"]')) return 'listen';
+    if (document.querySelector('[data-test*="challenge-translate"]')) return 'translate';
+
     return 'unknown';
   }
 
@@ -413,34 +460,53 @@ class DuolingoKoreanQuickSelect {
    * @returns {boolean} 처리했으면 true
    */
   handleAudioShortcuts(event, key) {
-    // 오디오 단축키 (1: 일반, 2: 느림)
-    if (key !== this.keyBindings.audio.normal && key !== this.keyBindings.audio.slow) return false;
+    // 1번(일반), 2번(느림) 키 확인
+    if (key !== '1' && key !== '2') return false;
 
-    const challengeContainer = document.querySelector('[data-test*="challenge-listenTap"]');
+    // Ctrl 키가 눌렸거나, (Ctrl 안 눌리고) 입력 필드가 아닐 때만 동작
+    // (handleKeyDown에서 이미 분기 처리했지만 안전장치)
+    const isCtrl = event.ctrlKey;
+    if (!isCtrl && this.isInInputField()) return false;
+
+    // 챌린지 컨테이너 찾기 (범용)
+    const challengeContainer = document.querySelector('[data-test*="challenge-"]');
     if (!challengeContainer) return false;
+
+    // 오디오 버튼 찾기 전략:
+    // 1. data-test="audio-button" (일부 챌린지)
+    // 2. SVG 아이콘을 포함하는 버튼 (일반적인 구조)
+    // 3. 제외: 다음/건너뛰기/종료 버튼, 단어 은행 내 버튼, 탭 토큰
 
     const allButtons = Array.from(challengeContainer.querySelectorAll('button'));
 
-    // 제외할 버튼들 (단어 은행, 하단 버튼 등)
     const audioButtons = allButtons.filter(btn => {
+      // 명시적 제외
+      const testAttr = btn.getAttribute('data-test') || '';
+      if (['player-next', 'player-skip', 'quit-button'].some(t => testAttr.includes(t))) return false;
+
+      // 단어 은행 및 탭 토큰 제외
       if (btn.closest('[data-test="word-bank"]')) return false;
-      if (btn.closest('[data-test="player-next"]') || btn.closest('[data-test="player-skip"]')) return false;
-      if (btn.closest('[data-test="quit-button"]')) return false;
-      if (btn.getAttribute('data-test') && btn.getAttribute('data-test').includes('challenge-tap-token')) return false;
-      return true;
+      if (testAttr.includes('challenge-tap-token')) return false;
+
+      // 오디오 버튼 특성 확인
+      // 1. data-test에 'audio' 포함
+      if (testAttr.includes('audio')) return true;
+
+      // 2. SVG 아이콘 포함 (스피커/거북이 아이콘)
+      // (단, 텍스트가 없거나 숨겨진 텍스트만 있는 경우 등은 상황에 따라 다름)
+      if (btn.querySelector('svg')) return true;
+
+      return false;
     });
 
-    if (key === this.keyBindings.audio.normal && audioButtons[0]) {
-      console.log('🔊 일반 속도 재생');
+    // 보통 첫 번째가 일반 속도, 두 번째가 느린 속도
+    if (key === '1' && audioButtons[0]) {
+      console.log('🔊 일반 속도 재생 (Ctrl+1/1)');
       audioButtons[0].click();
-      event.preventDefault();
-      event.stopPropagation();
       return true;
-    } else if (key === this.keyBindings.audio.slow && audioButtons[1]) {
-      console.log('🐢 느린 속도 재생');
+    } else if (key === '2' && audioButtons[1]) {
+      console.log('🐢 느린 속도 재생 (Ctrl+2/2)');
       audioButtons[1].click();
-      event.preventDefault();
-      event.stopPropagation();
       return true;
     }
 
@@ -548,6 +614,8 @@ class DuolingoKoreanQuickSelect {
    * @param {string} key - 입력된 키
    */
   handleKoreanInput(event, key) {
+    console.log(`🔍 [DEBUG] handleKoreanInput 진입 - key: "${key}", currentInput: "${this.currentInput}"`);
+
     // Enter: 정확히 일치하는 단어가 있으면 선택
     if (key === this.keyBindings.korean.enter) {
       const exactMatchBtn = document.querySelector('.korean-quick-select-exact-match');
@@ -562,27 +630,7 @@ class DuolingoKoreanQuickSelect {
       return;
     }
 
-    // Backspace: 한 글자 삭제 또는 선택된 단어 삭제
-    if (key === 'Backspace' || key === 'Delete') {
-      if (this.currentInput !== '') {
-        this.preventEventPropagation(event);
-        this.currentInput = this.currentInput.slice(0, -1);
-        console.log(`⬅️ Backspace - 현재: "${this.currentInput}"`);
-        this.updateHighlight();
-        this.updateInputDisplay();
-      } else {
-        // 입력값이 없을 때 Backspace를 누르면 이미 선택된 단어 삭제
-        const placedButtons = this.getPlacedButtons();
-        if (placedButtons.length > 0) {
-          this.preventEventPropagation(event);
-          const lastButton = placedButtons[placedButtons.length - 1];
-          console.log(`🗑️ 선택된 단어 삭제: "${lastButton.textContent.trim()}"`);
-          lastButton.click();
-          lastButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        }
-      }
-      return;
-    }
+    // Backspace 처리는 handleKeyDown으로 이동됨
 
     let nextInput = null;
 
@@ -658,7 +706,7 @@ class DuolingoKoreanQuickSelect {
     }, 200); // 에러 표시 시간도 단축
   }
 
-  updateHighlight() {
+  updateHighlight(allowAutoSelect = true) {
     this.clearHighlight();
 
     if (this.currentInput === '') {
@@ -727,6 +775,9 @@ class DuolingoKoreanQuickSelect {
     // 자동 선택 로직
     // 1. 정확히 일치하는 단어가 있거나
     // 2. 남은 후보 단어가 딱 하나일 때 (부분 일치 자동 선택)
+
+    // 🚨 allowAutoSelect가 false면 자동 선택 안 함 (Backspace 등)
+    if (!allowAutoSelect) return;
 
     const allMatchedTexts = new Set(matchedButtons.map(b => b.textContent.trim()));
 
@@ -820,17 +871,28 @@ class DuolingoKoreanQuickSelect {
   getPlacedButtons() {
     // 모든 토큰 버튼 찾기
     const allButtons = Array.from(document.querySelectorAll('[data-test*="challenge-tap-token"]'));
+    console.log(`🔍 [DEBUG] getPlacedButtons - 전체 버튼: ${allButtons.length}개`);
 
     // 단어 은행(word-bank) 찾기
     const wordBank = document.querySelector('[data-test="word-bank"]');
 
-    if (!wordBank) return [];
+    if (!wordBank) {
+      console.log(`🔍 [DEBUG] word-bank 없음`);
+      return [];
+    }
 
     // 단어 은행 안에 없는 버튼들이 정답 영역에 있는 버튼들임
     // (그리고 화면에 보여야 함)
-    return allButtons.filter(button => {
-      return !wordBank.contains(button) && button.offsetParent !== null;
+    const placedButtons = allButtons.filter(button => {
+      const isPlaced = !wordBank.contains(button) && button.offsetParent !== null;
+      if (isPlaced) {
+        console.log(`🔍 [DEBUG] 선택된 버튼 발견: "${button.textContent.trim()}"`);
+      }
+      return isPlaced;
     });
+
+    console.log(`🔍 [DEBUG] getPlacedButtons 결과: ${placedButtons.length}개`);
+    return placedButtons;
   }
 }
 
