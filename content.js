@@ -149,6 +149,11 @@ class DuolingoKoreanQuickSelect {
         }
       },
 
+      // Stories 챌린지 (스토리 객관식)
+      stories: {
+        buttons: ['1', '2', '3']
+      },
+
       // 한글 입력
       korean: {
         enter: 'Enter',
@@ -331,6 +336,15 @@ class DuolingoKoreanQuickSelect {
   handleKeyDown(event) {
     const key = event.key;
 
+    // 🔍 [DEBUG] 모든 키 이벤트 상세 로깅
+    console.log(`🔑 [KEY] key="${key}" | isTrusted=${event.isTrusted} | code="${event.code}" | keyCode=${event.keyCode} | target=${event.target.tagName}`);
+
+    // 🚨 [최우선] 합성 이벤트 차단 (듀오링고가 버튼 클릭 시 생성하는 가짜 키 이벤트)
+    if (!event.isTrusted) {
+      console.log(`🚫 [BLOCKED] 합성 이벤트 차단: "${key}"`);
+      return;
+    }
+
     // 1. [최우선] Ctrl+1, Ctrl+2 오디오 단축키 (타이핑 중에도 동작)
     // 🚨 브라우저 탭 전환 방지 (필수) 및 오디오 재생
     if (event.ctrlKey && (key === '1' || key === '2')) {
@@ -369,7 +383,6 @@ class DuolingoKoreanQuickSelect {
           const lastButton = placedButtons[placedButtons.length - 1];
           console.log(`🗑️ 선택된 단어 삭제: "${lastButton.textContent.trim()}"`);
           lastButton.click();
-          lastButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
           return;
         }
       }
@@ -421,8 +434,13 @@ class DuolingoKoreanQuickSelect {
   detectChallengeType() {
     if (document.querySelector('[data-test*="challenge-orderTapComplete"]')) return 'orderTapComplete';
     if (document.querySelector('[data-test*="challenge-listenTap"]')) return 'listenTap';
+
+    // Match 챌린지 (일반 또는 Stories 내부)
     if (document.querySelector('[data-test*="challenge-match"]')) return 'match';
     if (document.querySelector('[data-test*="challenge-listenMatch"]')) return 'listenMatch';
+
+    // Stories 챌린지 (객관식)
+    if (document.querySelector('button[data-test="stories-choice"]')) return 'stories';
 
     // 타이핑이 필요한 챌린지 추가
     if (document.querySelector('[data-test*="challenge-listen"]')) return 'listen';
@@ -527,6 +545,8 @@ class DuolingoKoreanQuickSelect {
         return this.handleMatchChallenge(event, key);
       case 'listenMatch':
         return this.handleListenMatchChallenge(event, key);
+      case 'stories':
+        return this.handleStoriesChallenge(event, key);
       default:
         return false;
     }
@@ -605,6 +625,50 @@ class DuolingoKoreanQuickSelect {
       }
     }
 
+    return false;
+  }
+
+  /**
+   * Stories 챌린지 단축키 처리 (객관식)
+   * @param {Event} event - 키보드 이벤트
+   * @param {string} key - 입력된 키
+   * @returns {boolean} 처리했으면 true
+   */
+  handleStoriesChallenge(event, key) {
+    console.log(`📖 [STORIES] handleStoriesChallenge 진입 - key: "${key}"`);
+
+    // Stories 선택지 버튼 찾기
+    const choiceButtons = Array.from(document.querySelectorAll('button[data-test="stories-choice"]'));
+    console.log(`📖 [STORIES] 선택지 버튼 발견: ${choiceButtons.length}개`);
+
+    if (choiceButtons.length === 0) {
+      console.log(`⚠️ [STORIES] Stories 선택지 버튼을 찾을 수 없습니다`);
+      return false;
+    }
+
+    // 키 인덱스 찾기
+    const keyIndex = this.keyBindings.stories.buttons.indexOf(key);
+    console.log(`📖 [STORIES] 키 "${key}"의 인덱스: ${keyIndex}`);
+
+    if (keyIndex !== -1 && choiceButtons[keyIndex]) {
+      const targetButton = choiceButtons[keyIndex];
+      const choiceText = targetButton.closest('li')?.textContent.trim().substring(0, 50) || '(텍스트 없음)';
+
+      console.log(`📖 [STORIES] 선택: ${key} -> 버튼 ${keyIndex + 1} (${choiceText}...)`);
+
+      // 버튼 클릭
+      targetButton.click();
+
+      // 시각적 피드백
+      targetButton.style.transform = 'scale(0.95)';
+      setTimeout(() => targetButton.style.transform = 'scale(1)', 100);
+
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    }
+
+    console.log(`⚠️ [STORIES] 키 "${key}"에 해당하는 버튼이 없거나 범위를 벗어남`);
     return false;
   }
 
@@ -869,11 +933,36 @@ class DuolingoKoreanQuickSelect {
 
   // 정답 영역에 놓인 버튼들 찾기
   getPlacedButtons() {
-    // 모든 토큰 버튼 찾기
+    const challengeType = this.detectChallengeType();
+    console.log(`🔍 [DEBUG] getPlacedButtons - 챌린지 타입: ${challengeType}`);
+
+    // ✅ orderTapComplete 챌린지 특수 처리
+    if (challengeType === 'orderTapComplete') {
+      // "Selected gap" 영역 찾기 (실제로 사용자가 선택한 단어들이 여기 있음)
+      const selectedGap = document.querySelector('[aria-label="Selected gap"]');
+
+      if (!selectedGap) {
+        console.log(`🔍 [DEBUG] Selected gap 없음 (아직 아무것도 선택 안 함)`);
+        return [];
+      }
+
+      // Selected gap 안의 버튼들만 반환 (이게 진짜 선택된 버튼들)
+      const selectedButtons = Array.from(
+        selectedGap.querySelectorAll('button[data-test*="challenge-tap-token"]')
+      ).filter(btn => btn.offsetParent !== null);
+
+      console.log(`🔍 [DEBUG] Selected gap 안의 버튼: ${selectedButtons.length}개`);
+      selectedButtons.forEach(btn => {
+        console.log(`   ✓ "${btn.textContent.trim()}" (${btn.getAttribute('data-test')})`);
+      });
+
+      return selectedButtons;
+    }
+
+    // ✅ 다른 챌린지: 기존 로직 (word-bank 밖의 버튼)
     const allButtons = Array.from(document.querySelectorAll('[data-test*="challenge-tap-token"]'));
     console.log(`🔍 [DEBUG] getPlacedButtons - 전체 버튼: ${allButtons.length}개`);
 
-    // 단어 은행(word-bank) 찾기
     const wordBank = document.querySelector('[data-test="word-bank"]');
 
     if (!wordBank) {
@@ -882,17 +971,25 @@ class DuolingoKoreanQuickSelect {
     }
 
     // 단어 은행 안에 없는 버튼들이 정답 영역에 있는 버튼들임
-    // (그리고 화면에 보여야 함)
-    const placedButtons = allButtons.filter(button => {
-      const isPlaced = !wordBank.contains(button) && button.offsetParent !== null;
-      if (isPlaced) {
-        console.log(`🔍 [DEBUG] 선택된 버튼 발견: "${button.textContent.trim()}"`);
+    const placedButtons = allButtons.filter(button =>
+      !wordBank.contains(button) && button.offsetParent !== null
+    );
+
+    // 중복 제거: data-test 속성 기준
+    const seen = new Set();
+    const uniqueButtons = placedButtons.filter(button => {
+      const dataTest = button.getAttribute('data-test');
+      if (seen.has(dataTest)) {
+        console.log(`🔍 [DEBUG] 중복 버튼 제거: "${button.textContent.trim()}" (${dataTest})`);
+        return false;
       }
-      return isPlaced;
+      seen.add(dataTest);
+      console.log(`🔍 [DEBUG] 선택된 버튼 발견: "${button.textContent.trim()}" (${dataTest})`);
+      return true;
     });
 
-    console.log(`🔍 [DEBUG] getPlacedButtons 결과: ${placedButtons.length}개`);
-    return placedButtons;
+    console.log(`🔍 [DEBUG] getPlacedButtons 결과: ${uniqueButtons.length}개 (중복 제거 전: ${placedButtons.length}개)`);
+    return uniqueButtons;
   }
 }
 
