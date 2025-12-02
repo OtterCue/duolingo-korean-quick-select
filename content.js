@@ -562,19 +562,41 @@ class DuolingoKoreanQuickSelect {
     const matchContainer = document.querySelector('[data-test*="challenge-match"]');
     if (!matchContainer) return false;
 
-    const buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+    // 모든 버튼 가져오기 (disabled 포함)
+    let buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
 
-    // 키 매핑 테이블 (keyBindings에서 생성)
-    const keyMap = {};
-    this.keyBindings.match.buttons.forEach((key, index) => {
-      keyMap[key] = index;
+    // 🎯 화면상 위치 기준으로 정렬 (5행 2열 레이아웃)
+    // Y 좌표(행) 우선, 같은 행에서는 X 좌표(열) 기준
+    buttons = buttons.sort((a, b) => {
+      const rectA = a.getBoundingClientRect();
+      const rectB = b.getBoundingClientRect();
+
+      // 행 기준 정렬 (Y 좌표, 10px 허용 오차)
+      const yDiff = rectA.top - rectB.top;
+      if (Math.abs(yDiff) > 10) {
+        return yDiff; // 위에 있는 버튼이 먼저
+      }
+
+      // 같은 행이면 열 기준 정렬 (X 좌표)
+      return rectA.left - rectB.left; // 왼쪽 버튼이 먼저
     });
-    Object.assign(keyMap, this.keyBindings.match.alternates);
+
+    // 키 매핑: 왼쪽 열(1-5), 오른쪽 열(6-0 또는 q-t)
+    const keyMap = {
+      '1': 0, '2': 1, '3': 2, '4': 3, '5': 4,  // 왼쪽 열
+      '6': 5, '7': 6, '8': 7, '9': 8, '0': 9,  // 오른쪽 열 (숫자)
+      'q': 5, 'w': 6, 'e': 7, 'r': 8, 't': 9   // 오른쪽 열 (문자)
+    };
 
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
       const index = keyMap[key.toLowerCase()];
       if (buttons[index]) {
-        console.log(`🔗 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
+        const btnText = buttons[index].textContent.trim();
+        const isDisabled = buttons[index].getAttribute('aria-disabled') === 'true';
+
+        console.log(`🔗 짝짓기 선택: ${key} -> [${index}] "${btnText}" ${isDisabled ? '(disabled, 무시됨)' : ''}`);
+
+        // disabled 버튼은 클릭해도 무시됨 (듀오링고가 처리)
         buttons[index].click();
 
         // 시각적 피드백
@@ -600,7 +622,9 @@ class DuolingoKoreanQuickSelect {
     const listenMatchContainer = document.querySelector('[data-test*="challenge-listenMatch"]');
     if (!listenMatchContainer) return false;
 
-    const buttons = Array.from(listenMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+    // ✅ disabled된 버튼 제외 (aria-disabled="true")
+    const buttons = Array.from(listenMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'))
+      .filter(btn => btn.getAttribute('aria-disabled') !== 'true');
 
     // 키 매핑 테이블 (keyBindings에서 생성)
     const keyMap = {};
@@ -612,7 +636,7 @@ class DuolingoKoreanQuickSelect {
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
       const index = keyMap[key.toLowerCase()];
       if (buttons[index]) {
-        console.log(`🎧🔗 듣기 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
+        console.log(`🎧🔗 듣기 짝짓기 선택: ${key} -> 버튼 ${index + 1} "${buttons[index].textContent.trim()}"`);
         buttons[index].click();
 
         // 시각적 피드백
