@@ -1,0 +1,73 @@
+.korean-quick-select-highlight {
+  background-color: white !important;
+  color: #1cb0f6 !important;
+  border: 2px solid #1cb0f6 !important;
+  transition: all 0.1s ease;
+  transform: scale(1.02);
+  z-index: 10 !important;
+}
+
+.korean-quick-select-highlight * {
+  background-color: transparent !important;
+  color: #1cb0f6 !important;
+  text-shadow: none !important;
+}
+
+.korean-quick-select-exact-match {
+  background-color: white !important;
+  color: #58cc02 !important;
+  border: 2px solid #58cc02 !important;
+  box-shadow: 0 0 0 2px #58cc02 !important;
+  transform: scale(1.05);
+  z-index: 11 !important;
+}
+
+.korean-quick-select-exact-match * {
+  background-color: transparent !important;
+  color: #58cc02 !important;
+  text-shadow: none !important;
+}
+
+/* 화면 우측 상단 입력 표시 */
+.kqs-input-display {
+  position: fixed;
+  top: 100px;
+  right: 20px;
+  background: rgba(28, 176, 246, 0.95);
+  color: white;
+  padding: 15px 25px;
+  border-radius: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 24px;
+  font-weight: bold;
+  z-index: 999999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.1s ease;
+}
+
+.kqs-input-display.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.kqs-input-display .kqs-help {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-top: 5px;
+}
+
+.kqs-error {
+  background: rgba(255, 82, 82, 0.95) !important;
+  animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
