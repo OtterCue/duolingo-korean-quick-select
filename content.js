@@ -31,16 +31,27 @@ class DuolingoKoreanQuickSelect {
       // Match 챌린지 (짝짓기)
       match: {
         buttons: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+        // alternates: 화면 버튼 번호(1-based)로 지정 (사용 시 -1 해서 인덱스로 변환)
+        // 예: 'q': 6 → 6번 버튼 → buttons[5]
         alternates: {
-          'q': 5, 'w': 6, 'e': 7, 'r': 8, 't': 9
+          'q': 6,  // 6번 버튼
+          'w': 7,  // 7번 버튼
+          'e': 8,  // 8번 버튼
+          'r': 9,  // 9번 버튼
+          't': 10  // 0번 키 (듀오링고에서 0은 10번째 버튼)
         }
       },
 
       // Listen Match 챌린지 (듣기 짝짓기)
       listenMatch: {
         buttons: ['1', '2', '3', '4', '5', '6', '7', '8'],
+        // alternates: 화면 버튼 번호(1-based)로 지정 (사용 시 -1 해서 인덱스로 변환)
+        // 예: 'q': 5 → 5번 버튼 → buttons[4]
         alternates: {
-          'q': 4, 'w': 5, 'e': 6, 'r': 7
+          'q': 5,  // 5번 버튼
+          'w': 6,  // 6번 버튼
+          'e': 7,  // 7번 버튼
+          'r': 8   // 8번 버튼
         }
       },
 
@@ -379,10 +390,17 @@ class DuolingoKoreanQuickSelect {
 
     // 키 매핑 테이블 (keyBindings에서 생성)
     const keyMap = {};
+    // 숫자 키: 배열 인덱스(0-based)로 매핑
+    // '1' → 0, '2' → 1, ..., '9' → 8, '0' → 9
     this.keyBindings.match.buttons.forEach((key, index) => {
       keyMap[key] = index;
     });
-    Object.assign(keyMap, this.keyBindings.match.alternates);
+    // alternates: 화면 번호(1-based)를 인덱스(0-based)로 변환
+    // 'q': 6 → buttons[5] (6번 버튼), 't': 10 → buttons[9] (0번 키 = 10번 버튼)
+    Object.keys(this.keyBindings.match.alternates).forEach(altKey => {
+      const buttonNumber = this.keyBindings.match.alternates[altKey];
+      keyMap[altKey] = buttonNumber - 1; // 화면 번호 → 배열 인덱스
+    });
 
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
       const index = keyMap[key.toLowerCase()];
@@ -417,10 +435,17 @@ class DuolingoKoreanQuickSelect {
 
     // 키 매핑 테이블 (keyBindings에서 생성)
     const keyMap = {};
+    // 숫자 키: 배열 인덱스(0-based)로 매핑
+    // '1' → 0, '2' → 1, ..., '8' → 7
     this.keyBindings.listenMatch.buttons.forEach((key, index) => {
       keyMap[key] = index;
     });
-    Object.assign(keyMap, this.keyBindings.listenMatch.alternates);
+    // alternates: 화면 번호(1-based)를 인덱스(0-based)로 변환
+    // 'q': 5 → buttons[4] (5번 버튼)
+    Object.keys(this.keyBindings.listenMatch.alternates).forEach(altKey => {
+      const buttonNumber = this.keyBindings.listenMatch.alternates[altKey];
+      keyMap[altKey] = buttonNumber - 1; // 화면 번호 → 배열 인덱스
+    });
 
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
       const index = keyMap[key.toLowerCase()];
