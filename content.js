@@ -1,108 +1,3 @@
-// 영어 키보드 → 한글 자모 매핑 (QWERTY 자판 기준)
-const KEY_MAP = {
-  // 자음 (Consonants)
-  'q': 'ㅂ', 'Q': 'ㅃ',
-  'w': 'ㅈ', 'W': 'ㅉ',
-  'e': 'ㄷ', 'E': 'ㄸ',
-  'r': 'ㄱ', 'R': 'ㄲ',
-  't': 'ㅅ', 'T': 'ㅆ',
-  'a': 'ㅁ',
-  's': 'ㄴ',
-  'd': 'ㅇ',
-  'f': 'ㄹ',
-  'g': 'ㅎ',
-  'z': 'ㅋ',
-  'x': 'ㅌ',
-  'c': 'ㅊ',
-  'v': 'ㅍ',
-
-  // 모음 (Vowels)
-  'y': 'ㅛ',
-  'u': 'ㅕ',
-  'i': 'ㅑ',
-  'o': 'ㅐ', 'O': 'ㅒ',
-  'p': 'ㅔ', 'P': 'ㅖ',
-  'h': 'ㅗ',
-  'j': 'ㅓ',
-  'k': 'ㅏ',
-  'l': 'ㅣ',
-  'b': 'ㅠ',
-  'n': 'ㅜ',
-  'm': 'ㅡ'
-};
-
-// 한글 초성 리스트
-const CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
-// 한글 중성 리스트
-const JUNGSUNG_LIST = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'];
-// 한글 종성 리스트 (0은 종성 없음)
-const JONGSUNG_LIST = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
-
-// 복합 모음 분해 맵 (키보드 입력 순서대로)
-const COMPLEX_VOWELS = {
-  'ㅘ': 'ㅗㅏ',
-  'ㅙ': 'ㅗㅐ',
-  'ㅚ': 'ㅗㅣ',
-  'ㅝ': 'ㅜㅓ',
-  'ㅞ': 'ㅜㅔ',
-  'ㅟ': 'ㅜㅣ',
-  'ㅢ': 'ㅡㅣ'
-};
-
-const HANGUL_START = 0xAC00;
-const HANGUL_END = 0xD7A3;
-
-// 텍스트에서 초성만 추출
-function getChosung(text) {
-  let chosung = '';
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    if (code >= HANGUL_START && code <= HANGUL_END) {
-      const chosungIndex = Math.floor((code - HANGUL_START) / 588);
-      chosung += CHOSUNG_LIST[chosungIndex];
-    } else if (CHOSUNG_LIST.includes(text[i])) {
-      chosung += text[i];
-    } else {
-      chosung += text[i]; // 한글이 아니면 그대로
-    }
-  }
-  return chosung;
-}
-
-// 텍스트를 자모 단위로 분해 (복합 모음도 키 입력 단위로 분해)
-function getDisassembled(text) {
-  let result = '';
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    if (code >= HANGUL_START && code <= HANGUL_END) {
-      const charCode = code - HANGUL_START;
-      const chosungIndex = Math.floor(charCode / 588);
-      const jungsungIndex = Math.floor((charCode % 588) / 28);
-      const jongsungIndex = charCode % 28;
-
-      result += CHOSUNG_LIST[chosungIndex];
-
-      const vowel = JUNGSUNG_LIST[jungsungIndex];
-      if (COMPLEX_VOWELS[vowel]) {
-        result += COMPLEX_VOWELS[vowel];
-      } else {
-        result += vowel;
-      }
-
-      if (jongsungIndex > 0) {
-        // 종성도 복합 자음인 경우 분해할 수 있으나, 
-        // 현재 키 매핑상 종성 복합 자음(ㄳ, ㄵ 등)은 Shift 조합이 아니라 
-        // 낱자 입력(ㄱ+ㅅ, ㄴ+ㅈ)으로 처리되므로 일단 그대로 둠.
-        // 필요시 JONGSUNG_LIST 매핑 추가 가능.
-        result += JONGSUNG_LIST[jongsungIndex];
-      }
-    } else {
-      result += text[i];
-    }
-  }
-  return result;
-}
-
 class DuolingoKoreanQuickSelect {
   constructor() {
     this.currentInput = '';
@@ -136,16 +31,27 @@ class DuolingoKoreanQuickSelect {
       // Match 챌린지 (짝짓기)
       match: {
         buttons: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+        // alternates: 화면 버튼 번호(1-based)로 지정 (사용 시 -1 해서 인덱스로 변환)
+        // 예: 'q': 6 → 6번 버튼 → buttons[5]
         alternates: {
-          'q': 5, 'w': 6, 'e': 7, 'r': 8, 't': 9
+          'q': 6,  // 6번 버튼
+          'w': 7,  // 7번 버튼
+          'e': 8,  // 8번 버튼
+          'r': 9,  // 9번 버튼
+          't': 10  // 0번 키 (듀오링고에서 0은 10번째 버튼)
         }
       },
 
       // Listen Match 챌린지 (듣기 짝짓기)
       listenMatch: {
         buttons: ['1', '2', '3', '4', '5', '6', '7', '8'],
+        // alternates: 화면 버튼 번호(1-based)로 지정 (사용 시 -1 해서 인덱스로 변환)
+        // 예: 'q': 5 → 5번 버튼 → buttons[4]
         alternates: {
-          'q': 4, 'w': 5, 'e': 6, 'r': 7
+          'q': 5,  // 5번 버튼
+          'w': 6,  // 6번 버튼
+          'e': 7,  // 7번 버튼
+          'r': 8   // 8번 버튼
         }
       },
 
@@ -163,8 +69,6 @@ class DuolingoKoreanQuickSelect {
 
     console.log('🎯 Duolingo Korean Quick Select 초기화 중...');
     console.log('💡 하이브리드 매칭 모드 (초성 + 자모)');
-
-    this.injectStyles();
 
     // 키보드 이벤트 리스너 (window 레벨로 격상, 캡처링 사용)
     window.addEventListener('keydown', this.handleKeyDown.bind(this), true);
@@ -184,86 +88,6 @@ class DuolingoKoreanQuickSelect {
     this.observePageChanges();
 
     console.log('✅ Duolingo Korean Quick Select 활성화됨!');
-  }
-
-  injectStyles() {
-    const style = document.createElement('style');
-    style.textContent = `
-      .korean-quick-select-highlight {
-        background-color: white !important;
-        color: #1cb0f6 !important;
-        border: 2px solid #1cb0f6 !important;
-        transition: all 0.1s ease;
-        transform: scale(1.02);
-        z-index: 10 !important;
-      }
-      
-      .korean-quick-select-highlight * {
-        background-color: transparent !important;
-        color: #1cb0f6 !important;
-        text-shadow: none !important;
-      }
-      
-      .korean-quick-select-exact-match {
-        background-color: white !important;
-        color: #58cc02 !important;
-        border: 2px solid #58cc02 !important;
-        box-shadow: 0 0 0 2px #58cc02 !important;
-        transform: scale(1.05);
-        z-index: 11 !important;
-      }
-
-      .korean-quick-select-exact-match * {
-        background-color: transparent !important;
-        color: #58cc02 !important;
-        text-shadow: none !important;
-      }
-      
-      /* 화면 우측 상단 입력 표시 */
-      .kqs-input-display {
-        position: fixed;
-        top: 100px;
-        right: 20px;
-        background: rgba(28, 176, 246, 0.95);
-        color: white;
-        padding: 15px 25px;
-        border-radius: 12px;
-        font-family: 'Courier New', monospace;
-        font-size: 24px;
-        font-weight: bold;
-        z-index: 999999;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        pointer-events: none;
-        opacity: 0;
-        transform: translateY(-10px);
-        transition: all 0.1s ease;
-      }
-      
-      .kqs-input-display.visible {
-        opacity: 1;
-        transform: translateY(0);
-      }
-      
-      .kqs-input-display .kqs-help {
-        font-size: 11px;
-        opacity: 0.8;
-        margin-top: 5px;
-      }
-
-      .kqs-error {
-        background: rgba(255, 82, 82, 0.95) !important;
-        animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both;
-      }
-
-      @keyframes shake {
-        10%, 90% { transform: translate3d(-1px, 0, 0); }
-        20%, 80% { transform: translate3d(2px, 0, 0); }
-        30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-        40%, 60% { transform: translate3d(4px, 0, 0); }
-      }
-    `;
-    document.head.appendChild(style);
-    console.log('✅ CSS 스타일 주입 완료');
   }
 
   createInputDisplay() {
@@ -562,41 +386,26 @@ class DuolingoKoreanQuickSelect {
     const matchContainer = document.querySelector('[data-test*="challenge-match"]');
     if (!matchContainer) return false;
 
-    // 모든 버튼 가져오기 (disabled 포함)
-    let buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+    const buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
 
-    // 🎯 화면상 위치 기준으로 정렬 (5행 2열 레이아웃)
-    // Y 좌표(행) 우선, 같은 행에서는 X 좌표(열) 기준
-    buttons = buttons.sort((a, b) => {
-      const rectA = a.getBoundingClientRect();
-      const rectB = b.getBoundingClientRect();
-
-      // 행 기준 정렬 (Y 좌표, 10px 허용 오차)
-      const yDiff = rectA.top - rectB.top;
-      if (Math.abs(yDiff) > 10) {
-        return yDiff; // 위에 있는 버튼이 먼저
-      }
-
-      // 같은 행이면 열 기준 정렬 (X 좌표)
-      return rectA.left - rectB.left; // 왼쪽 버튼이 먼저
+    // 키 매핑 테이블 (keyBindings에서 생성)
+    const keyMap = {};
+    // 숫자 키: 배열 인덱스(0-based)로 매핑
+    // '1' → 0, '2' → 1, ..., '9' → 8, '0' → 9
+    this.keyBindings.match.buttons.forEach((key, index) => {
+      keyMap[key] = index;
     });
-
-    // 키 매핑: 왼쪽 열(1-5), 오른쪽 열(6-0 또는 q-t)
-    const keyMap = {
-      '1': 0, '2': 1, '3': 2, '4': 3, '5': 4,  // 왼쪽 열
-      '6': 5, '7': 6, '8': 7, '9': 8, '0': 9,  // 오른쪽 열 (숫자)
-      'q': 5, 'w': 6, 'e': 7, 'r': 8, 't': 9   // 오른쪽 열 (문자)
-    };
+    // alternates: 화면 번호(1-based)를 인덱스(0-based)로 변환
+    // 'q': 6 → buttons[5] (6번 버튼), 't': 10 → buttons[9] (0번 키 = 10번 버튼)
+    Object.keys(this.keyBindings.match.alternates).forEach(altKey => {
+      const buttonNumber = this.keyBindings.match.alternates[altKey];
+      keyMap[altKey] = buttonNumber - 1; // 화면 번호 → 배열 인덱스
+    });
 
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
       const index = keyMap[key.toLowerCase()];
       if (buttons[index]) {
-        const btnText = buttons[index].textContent.trim();
-        const isDisabled = buttons[index].getAttribute('aria-disabled') === 'true';
-
-        console.log(`🔗 짝짓기 선택: ${key} -> [${index}] "${btnText}" ${isDisabled ? '(disabled, 무시됨)' : ''}`);
-
-        // disabled 버튼은 클릭해도 무시됨 (듀오링고가 처리)
+        console.log(`🔗 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
         buttons[index].click();
 
         // 시각적 피드백
@@ -622,21 +431,26 @@ class DuolingoKoreanQuickSelect {
     const listenMatchContainer = document.querySelector('[data-test*="challenge-listenMatch"]');
     if (!listenMatchContainer) return false;
 
-    // ✅ disabled된 버튼 제외 (aria-disabled="true")
-    const buttons = Array.from(listenMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'))
-      .filter(btn => btn.getAttribute('aria-disabled') !== 'true');
+    const buttons = Array.from(listenMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
 
     // 키 매핑 테이블 (keyBindings에서 생성)
     const keyMap = {};
+    // 숫자 키: 배열 인덱스(0-based)로 매핑
+    // '1' → 0, '2' → 1, ..., '8' → 7
     this.keyBindings.listenMatch.buttons.forEach((key, index) => {
       keyMap[key] = index;
     });
-    Object.assign(keyMap, this.keyBindings.listenMatch.alternates);
+    // alternates: 화면 번호(1-based)를 인덱스(0-based)로 변환
+    // 'q': 5 → buttons[4] (5번 버튼)
+    Object.keys(this.keyBindings.listenMatch.alternates).forEach(altKey => {
+      const buttonNumber = this.keyBindings.listenMatch.alternates[altKey];
+      keyMap[altKey] = buttonNumber - 1; // 화면 번호 → 배열 인덱스
+    });
 
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
       const index = keyMap[key.toLowerCase()];
       if (buttons[index]) {
-        console.log(`🎧🔗 듣기 짝짓기 선택: ${key} -> 버튼 ${index + 1} "${buttons[index].textContent.trim()}"`);
+        console.log(`🎧🔗 듣기 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
         buttons[index].click();
 
         // 시각적 피드백
@@ -731,11 +545,11 @@ class DuolingoKoreanQuickSelect {
       nextInput = this.currentInput + key;
     }
     // 영어 키 → 한글 자모 변환
-    else if (KEY_MAP[key]) {
-      nextInput = this.currentInput + KEY_MAP[key];
+    else if (window.KEY_MAP && window.KEY_MAP[key]) {
+      nextInput = this.currentInput + window.KEY_MAP[key];
     }
     // 한글 자모 직접 입력
-    else if (CHOSUNG_LIST.includes(key) || JUNGSUNG_LIST.includes(key)) {
+    else if (window.CHOSUNG_LIST && (window.CHOSUNG_LIST.includes(key) || window.JUNGSUNG_LIST.includes(key))) {
       nextInput = this.currentInput + key;
     }
 
@@ -751,8 +565,8 @@ class DuolingoKoreanQuickSelect {
 
         if (lang === 'ko' || hasKorean) {
           // 한글 단어: 초성/자모 매칭
-          const chosung = getChosung(text);
-          const disassembled = getDisassembled(text);
+          const chosung = window.getChosung(text);
+          const disassembled = window.getDisassembled(text);
           return chosung.startsWith(nextInput) || disassembled.startsWith(nextInput);
         } else if (isOrderTapComplete && lang === 'en') {
           // 영어 단어: 대소문자 무시하고 prefix 매칭
@@ -821,8 +635,8 @@ class DuolingoKoreanQuickSelect {
 
       if (lang === 'ko' || hasKorean) {
         // 한글 매칭: 기존 로직 (초성 또는 자모 분해)
-        const chosung = getChosung(text);
-        const disassembled = getDisassembled(text);
+        const chosung = window.getChosung(text);
+        const disassembled = window.getDisassembled(text);
 
         if (chosung.startsWith(this.currentInput) || disassembled.startsWith(this.currentInput)) {
           isMatch = true;

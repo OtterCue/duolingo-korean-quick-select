@@ -19,7 +19,13 @@
         "https://www.duolingo.com/*",
         "https://*.duolingo.com/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "hangul.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }
