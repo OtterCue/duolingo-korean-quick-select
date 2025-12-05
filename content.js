@@ -305,6 +305,11 @@ class DuolingoKoreanQuickSelect {
     // 1번(일반), 2번(느림) 키 확인
     if (key !== '1' && key !== '2') return false;
 
+    // 🚨 Match 챌린지에서는 오디오 단축키 비활성화 (1, 2 키가 버튼 선택에 사용됨)
+    if (document.querySelector('[data-test*="challenge-match"]')) {
+      return false;
+    }
+
     // Ctrl 키가 눌렸거나, (Ctrl 안 눌리고) 입력 필드가 아닐 때만 동작
     // (handleKeyDown에서 이미 분기 처리했지만 안전장치)
     const isCtrl = event.ctrlKey;
@@ -383,29 +388,183 @@ class DuolingoKoreanQuickSelect {
    * @returns {boolean} 처리했으면 true
    */
   handleMatchChallenge(event, key) {
-    const matchContainer = document.querySelector('[data-test*="challenge-match"]');
-    if (!matchContainer) return false;
+    // --match-challenge-rows 속성을 가진 컨테이너 찾기
+    const matchContainer = document.querySelector('[style*="--match-challenge-rows"]');
+    if (!matchContainer) {
+      // Fallback: 기존 방식
+      const fallbackContainer = document.querySelector('[data-test*="challenge-match"]');
+      if (!fallbackContainer) return false;
+      return this.handleMatchChallengeFallback(fallbackContainer, event, key);
+    }
 
-    const buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+    // 모든 버튼 찾기
+    const allButtons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+    if (allButtons.length === 0) {
+      const fallbackContainer = document.querySelector('[data-test*="challenge-match"]');
+      if (fallbackContainer) {
+        return this.handleMatchChallengeFallback(fallbackContainer, event, key);
+      }
+      return false;
+    }
+
+    // 🎯 핵심: 각 버튼에서 번호 추출 (span._3zbIX 안의 텍스트)
+    const buttonNumberMap = {}; // { '1': button1, '2': button2, ..., '0': button10 }
+
+    allButtons.forEach(button => {
+      const numberSpan = button.querySelector('span._3zbIX, span[class*="_3zbIX"]');
+      if (numberSpan) {
+        const displayNumber = numberSpan.textContent.trim(); // "1", "2", ..., "0"
+        buttonNumberMap[displayNumber] = button;
+      }
+    });
+
+    // 디버그: 찾은 버튼 번호들 출력
+    console.log(`🔍 [MATCH] 버튼 번호 발견:`, Object.keys(buttonNumberMap).sort());
+
+    // 키 매핑 테이블 생성
+    const keyMap = {};
+
+    // 1-5번 키: 왼쪽 열 (화면 번호 그대로 매핑)
+    ['1', '2', '3', '4', '5'].forEach(num => {
+      if (buttonNumberMap[num]) {
+        keyMap[num] = buttonNumberMap[num];
+      }
+    });
+
+    // 6-9번 키: 오른쪽 열 (화면 번호 그대로 매핑)
+    ['6', '7', '8', '9'].forEach(num => {
+      if (buttonNumberMap[num]) {
+        keyMap[num] = buttonNumberMap[num];
+      }
+    });
+
+    // 0번 키: 10번째 버튼 (화면에는 "0"으로 표시됨)
+    if (buttonNumberMap['0']) {
+      keyMap['0'] = buttonNumberMap['0'];
+    }
+
+    // alternates: q, w, e, r, t → 6, 7, 8, 9, 0번 버튼
+    Object.keys(this.keyBindings.match.alternates).forEach(altKey => {
+      const targetButtonNumber = this.keyBindings.match.alternates[altKey]; // 6, 7, 8, 9, 10
+      // 10은 화면에서 "0"으로 표시됨
+      const displayNumber = targetButtonNumber === 10 ? '0' : String(targetButtonNumber);
+
+      if (buttonNumberMap[displayNumber]) {
+        keyMap[altKey] = buttonNumberMap[displayNumber];
+      }
+    });
+
+    // 키 입력 처리
+    if (keyMap.hasOwnProperty(key.toLowerCase())) {
+      const targetButton = keyMap[key.toLowerCase()];
+      if (targetButton) {
+        // 화면 번호 역추출 (로그용)
+        const numberSpan = targetButton.querySelector('span._3zbIX, span[class*="_3zbIX"]');
+        const displayNumber = numberSpan ? numberSpan.textContent.trim() : '?';
+
+        console.log(`🔗 짝짓기 선택: "${key}" → 화면 번호 ${displayNumber}번 버튼`);
+        targetButton.click();
+
+        // 시각적 피드백
+        targetButton.style.transform = 'scale(0.95)';
+        setTimeout(() => targetButton.style.transform = 'scale(1)', 100);
+
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 버튼에서 번호 추출 (헬퍼 함수)
+   * @param {HTMLElement} button - 버튼 요소
+   * @returns {number|null} 버튼 번호 또는 null
+   */
+  getButtonNumber(button) {
+    const numberSpan = button.querySelector('span._3zbIX') || 
+                      button.querySelector('span[class*="_3zbIX"]');
+    if (numberSpan) {
+      const numberText = numberSpan.textContent.trim();
+      const buttonNumber = parseInt(numberText, 10);
+      if (!isNaN(buttonNumber)) {
+        return buttonNumber;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Match 챌린지 Fallback 처리 (기존 방식)
+   * @param {HTMLElement} matchContainer - Match 챌린지 컨테이너
+   * @param {Event} event - 키보드 이벤트
+   * @param {string} key - 입력된 키
+   * @returns {boolean} 처리했으면 true
+   */
+  handleMatchChallengeFallback(matchContainer, event, key) {
+    // 좌/우 열 구분 시도
+    const columns = matchContainer.querySelectorAll('ul');
+    let leftButtons = [];
+    let rightButtons = [];
+    let buttons = [];
+
+    if (columns.length >= 2) {
+      // ul 태그로 좌/우 열 구분 가능
+      leftButtons = Array.from(columns[0].querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+      rightButtons = Array.from(columns[1].querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+      buttons = [...leftButtons, ...rightButtons];
+    } else {
+      // ul 구조가 없으면 전체 버튼을 DOM 순서대로 사용 (왼쪽→오른쪽 가정)
+      buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+      // DOM 순서상 앞의 5개가 왼쪽, 뒤의 5개가 오른쪽이라고 가정
+      if (buttons.length >= 10) {
+        leftButtons = buttons.slice(0, 5);
+        rightButtons = buttons.slice(5, 10);
+      } else {
+        // 버튼이 10개 미만이면 그냥 순서대로 사용
+        leftButtons = buttons.slice(0, Math.ceil(buttons.length / 2));
+        rightButtons = buttons.slice(Math.ceil(buttons.length / 2));
+      }
+    }
+
+    if (buttons.length === 0) return false;
 
     // 키 매핑 테이블 (keyBindings에서 생성)
     const keyMap = {};
-    // 숫자 키: 배열 인덱스(0-based)로 매핑
-    // '1' → 0, '2' → 1, ..., '9' → 8, '0' → 9
-    this.keyBindings.match.buttons.forEach((key, index) => {
-      keyMap[key] = index;
-    });
-    // alternates: 화면 번호(1-based)를 인덱스(0-based)로 변환
-    // 'q': 6 → buttons[5] (6번 버튼), 't': 10 → buttons[9] (0번 키 = 10번 버튼)
+    
+    // 왼쪽 열 버튼 매핑: 1→0, 2→1, 3→2, 4→3, 5→4
+    for (let i = 0; i < leftButtons.length && i < 5; i++) {
+      const keyNum = String(i + 1);
+      keyMap[keyNum] = buttons.indexOf(leftButtons[i]);
+    }
+
+    // 오른쪽 열 버튼 매핑: 6→5, 7→6, 8→7, 9→8, 0→9
+    for (let i = 0; i < rightButtons.length && i < 5; i++) {
+      const keyNum = i === 4 ? '0' : String(i + 6); // 0번 키는 10번째 버튼
+      const buttonIndex = buttons.indexOf(rightButtons[i]);
+      if (buttonIndex !== -1) {
+        keyMap[keyNum] = buttonIndex;
+      }
+    }
+
+    // alternates: q-t 키를 오른쪽 열에 매핑
     Object.keys(this.keyBindings.match.alternates).forEach(altKey => {
       const buttonNumber = this.keyBindings.match.alternates[altKey];
-      keyMap[altKey] = buttonNumber - 1; // 화면 번호 → 배열 인덱스
+      const rightIndex = buttonNumber - 6; // 6→0, 7→1, 8→2, 9→3, 10→4
+      if (rightIndex >= 0 && rightIndex < rightButtons.length) {
+        const buttonIndex = buttons.indexOf(rightButtons[rightIndex]);
+        if (buttonIndex !== -1) {
+          keyMap[altKey] = buttonIndex;
+        }
+      }
     });
 
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
       const index = keyMap[key.toLowerCase()];
       if (buttons[index]) {
-        console.log(`🔗 짝짓기 선택: ${key} -> 버튼 ${index + 1}`);
+        console.log(`🔗 짝짓기 선택 (Fallback): ${key} -> 버튼 ${index + 1}`);
         buttons[index].click();
 
         // 시각적 피드백
