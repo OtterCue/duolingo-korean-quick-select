@@ -278,7 +278,7 @@ class DuolingoKoreanQuickSelect {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   /**
-   * 글로벌 단축키 처리 (ESC, 백틱)
+   * 글로벌 단축키 처리 (ESC, 백틱, Enter)
    * @param {Event} event - 키보드 이벤트
    * @param {string} key - 입력된 키
    * @returns {boolean} 처리했으면 true
@@ -302,6 +302,19 @@ class DuolingoKoreanQuickSelect {
         return true;
       }
       // 버튼이 없거나 보이지 않으면 조용히 무시
+      return false;
+    }
+
+    // Enter: 레전드 화면 계속하기 버튼 클릭
+    if (key === 'Enter') {
+      const legendaryButton = document.querySelector('button[data-test="legendary-session-end-continue"]');
+      if (legendaryButton && legendaryButton.offsetParent !== null) {
+        this.preventEventPropagation(event);
+        console.log('🎯 Enter - 레전드 화면 계속하기 버튼 클릭');
+        legendaryButton.click();
+        return true;
+      }
+      // 레전드 화면이 아니면 Enter 키를 가로채지 않음 (기존 동작 유지)
       return false;
     }
 
