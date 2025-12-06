@@ -278,7 +278,7 @@ class DuolingoKoreanQuickSelect {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   /**
-   * 글로벌 단축키 처리 (ESC)
+   * 글로벌 단축키 처리 (ESC, 백틱)
    * @param {Event} event - 키보드 이벤트
    * @param {string} key - 입력된 키
    * @returns {boolean} 처리했으면 true
@@ -290,6 +290,19 @@ class DuolingoKoreanQuickSelect {
       console.log('🔄 ESC - 초기화');
       this.resetHighlight();
       return true;
+    }
+
+    // 백틱(`): 스킵 버튼 클릭
+    if (key === '`' || event.code === 'Backquote') {
+      const skipButton = document.querySelector('button[data-test="player-skip"]');
+      if (skipButton && skipButton.offsetParent !== null) {
+        this.preventEventPropagation(event);
+        console.log('⏭️ 백틱(`) - 스킵 버튼 클릭');
+        skipButton.click();
+        return true;
+      }
+      // 버튼이 없거나 보이지 않으면 조용히 무시
+      return false;
     }
 
     return false;
