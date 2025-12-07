@@ -253,15 +253,25 @@ class DuolingoKoreanQuickSelect {
 
   /**
    * 현재 챌린지 타입 감지
-   * @returns {string} 챌린지 타입 ('listenTap', 'match', 'listenMatch', 'unknown')
+   * @returns {string} 챌린지 타입 ('listenTap', 'match', 'listenMatch', 'listenIsolation', 'unknown')
    */
   detectChallengeType() {
     if (document.querySelector('[data-test*="challenge-orderTapComplete"]')) return 'orderTapComplete';
     if (document.querySelector('[data-test*="challenge-listenTap"]')) return 'listenTap';
 
-    // Match 챌린지 (일반 또는 Stories 내부)
+    // Stories 모드 매칭 챌린지 (match보다 먼저 체크 - 더 구체적)
+    const storiesElement = document.querySelector('[data-test="stories-element"]');
+    if (storiesElement && storiesElement.querySelector('button[data-test$="-challenge-tap-token"]')) {
+      return 'storiesMatch';
+    }
+
+    // Match 챌린지 (일반)
     if (document.querySelector('[data-test*="challenge-match"]')) return 'match';
     if (document.querySelector('[data-test*="challenge-listenMatch"]')) return 'listenMatch';
+
+    // ListenIsolation 챌린지 (듣고 선택하기 - 선택지에 스피커 포함)
+    // challenge-listen보다 먼저 체크 (더 구체적)
+    if (document.querySelector('[data-test*="challenge-listenIsolation"]')) return 'listenIsolation';
 
     // Stories 챌린지 (객관식)
     if (document.querySelector('button[data-test="stories-choice"]')) return 'stories';
@@ -332,13 +342,44 @@ class DuolingoKoreanQuickSelect {
     if (key !== '1' && key !== '2') return false;
 
     // 🚨 Match 챌린지에서는 오디오 단축키 비활성화 (1, 2 키가 버튼 선택에 사용됨)
-    if (document.querySelector('[data-test*="challenge-match"]')) {
+    const challengeType = this.detectChallengeType();
+    if (challengeType === 'match' || challengeType === 'storiesMatch') {
+      return false;
+    }
+
+    // 🚨 ListenIsolation 챌린지 특수 처리
+    const isListenIsolation = document.querySelector('[data-test*="challenge-listenIsolation"]');
+    const isCtrl = event.ctrlKey;
+
+    if (isListenIsolation) {
+      // ListenIsolation에서는 일반 1, 2 키는 듀오링고 기본 동작에 맡김 (선택지 선택)
+      if (!isCtrl) {
+        return false;
+      }
+
+      // Ctrl+1, Ctrl+2만 처리: 맨 위 스피커만 클릭 (선택지 내부 스피커 제외)
+      const challengeContainer = document.querySelector('[data-test*="challenge-"]');
+      if (!challengeContainer) return false;
+
+      const topSpeakerButton = this.findTopSpeakerButton(challengeContainer);
+      if (topSpeakerButton) {
+        if (key === '1') {
+          console.log('🔊 맨 위 스피커 재생 (Ctrl+1)');
+          topSpeakerButton.click();
+          return true;
+        } else if (key === '2') {
+          // ListenIsolation에서는 보통 느린 속도 버튼이 없을 수 있음
+          // 하지만 일관성을 위해 두 번째 스피커를 찾아보거나 첫 번째를 클릭
+          console.log('🐢 맨 위 스피커 재생 (Ctrl+2)');
+          topSpeakerButton.click();
+          return true;
+        }
+      }
       return false;
     }
 
     // Ctrl 키가 눌렸거나, (Ctrl 안 눌리고) 입력 필드가 아닐 때만 동작
     // (handleKeyDown에서 이미 분기 처리했지만 안전장치)
-    const isCtrl = event.ctrlKey;
     if (!isCtrl && this.isInInputField()) return false;
 
     // 챌린지 컨테이너 찾기 (범용)
@@ -387,6 +428,41 @@ class DuolingoKoreanQuickSelect {
   }
 
   /**
+   * 맨 위 스피커 버튼 찾기 (선택지 내부 스피커 제외)
+   * @param {HTMLElement} challengeContainer - 챌린지 컨테이너
+   * @returns {HTMLElement|null} 맨 위 스피커 버튼 또는 null
+   */
+  findTopSpeakerButton(challengeContainer) {
+    const allButtons = Array.from(challengeContainer.querySelectorAll('button'));
+
+    // 선택지 내부 스피커를 제외한 오디오 버튼 찾기
+    const topAudioButtons = allButtons.filter(btn => {
+      // 명시적 제외
+      const testAttr = btn.getAttribute('data-test') || '';
+      if (['player-next', 'player-skip', 'quit-button'].some(t => testAttr.includes(t))) return false;
+
+      // 단어 은행 및 탭 토큰 제외
+      if (btn.closest('[data-test="word-bank"]')) return false;
+      if (testAttr.includes('challenge-tap-token')) return false;
+
+      // 🚨 중요: challenge-choice 내부의 버튼 제외 (선택지 내부 스피커)
+      if (btn.closest('[data-test="challenge-choice"]')) return false;
+
+      // 오디오 버튼 특성 확인
+      // 1. data-test에 'audio' 포함
+      if (testAttr.includes('audio')) return true;
+
+      // 2. SVG 아이콘 포함 (스피커/거북이 아이콘)
+      if (btn.querySelector('svg')) return true;
+
+      return false;
+    });
+
+    // 첫 번째 버튼이 맨 위 스피커 (일반 속도)
+    return topAudioButtons[0] || null;
+  }
+
+  /**
    * 챌린지별 단축키 라우터
    * @param {Event} event - 키보드 이벤트
    * @param {string} key - 입력된 키
@@ -397,6 +473,7 @@ class DuolingoKoreanQuickSelect {
 
     switch (challengeType) {
       case 'match':
+      case 'storiesMatch':
         return this.handleMatchChallenge(event, key);
       case 'listenMatch':
         return this.handleListenMatchChallenge(event, key);
@@ -414,18 +491,35 @@ class DuolingoKoreanQuickSelect {
    * @returns {boolean} 처리했으면 true
    */
   handleMatchChallenge(event, key) {
-    // --match-challenge-rows 속성을 가진 컨테이너 찾기
-    const matchContainer = document.querySelector('[style*="--match-challenge-rows"]');
+    // 컨테이너 찾기 순서: --match-challenge-rows → challenge-match → stories-element
+    let matchContainer = document.querySelector('[style*="--match-challenge-rows"]');
+    
     if (!matchContainer) {
       // Fallback: 기존 방식
       const fallbackContainer = document.querySelector('[data-test*="challenge-match"]');
-      if (!fallbackContainer) return false;
-      return this.handleMatchChallengeFallback(fallbackContainer, event, key);
+      if (fallbackContainer) {
+        return this.handleMatchChallengeFallback(fallbackContainer, event, key);
+      }
+      
+      // 스토리 모드 fallback: stories-element 내부에서 버튼 찾기
+      const storiesElement = document.querySelector('[data-test="stories-element"]');
+      if (storiesElement) {
+        const storiesButtons = Array.from(storiesElement.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+        if (storiesButtons.length > 0) {
+          // 스토리 모드 컨테이너를 matchContainer로 사용하여 기존 로직 재사용
+          matchContainer = storiesElement;
+        }
+      }
+      
+      if (!matchContainer) {
+        return false;
+      }
     }
 
     // 모든 버튼 찾기
     const allButtons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
     if (allButtons.length === 0) {
+      // 버튼이 없으면 fallback 시도
       const fallbackContainer = document.querySelector('[data-test*="challenge-match"]');
       if (fallbackContainer) {
         return this.handleMatchChallengeFallback(fallbackContainer, event, key);
