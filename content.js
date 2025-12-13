@@ -260,9 +260,17 @@ class DuolingoKoreanQuickSelect {
     if (document.querySelector('[data-test*="challenge-listenTap"]')) return 'listenTap';
 
     // Stories 모드 매칭 챌린지 (match보다 먼저 체크 - 더 구체적)
-    const storiesElement = document.querySelector('[data-test="stories-element"]');
-    if (storiesElement && storiesElement.querySelector('button[data-test$="-challenge-tap-token"]')) {
-      return 'storiesMatch';
+    // 🚨 수정: 페이지 전체에서 stories-element와 매치 버튼을 확인
+    const storiesElements = document.querySelectorAll('[data-test="stories-element"]');
+    const hasStoriesMatchButtons = document.querySelector('button[data-test$="-challenge-tap-token"]');
+    if (storiesElements.length > 0 && hasStoriesMatchButtons) {
+      // 버튼이 stories-element 컨텍스트 내에 있는지 확인 (NG0lu 클래스는 매치 컨테이너)
+      const matchContainer = document.querySelector('.NG0lu button[data-test$="-challenge-tap-token"]') ||
+        document.querySelector('._3dO1K button[data-test$="-challenge-tap-token"]');
+      if (matchContainer) {
+        console.log('🔍 [DETECT] storiesMatch 감지됨');
+        return 'storiesMatch';
+      }
     }
 
     // Match 챌린지 (일반)
@@ -501,19 +509,31 @@ class DuolingoKoreanQuickSelect {
         return this.handleMatchChallengeFallback(fallbackContainer, event, key);
       }
 
-      // 스토리 모드 fallback: stories-element 내부에서 버튼 찾기
-      const storiesElement = document.querySelector('[data-test="stories-element"]');
-      if (storiesElement) {
-        const storiesButtons = Array.from(storiesElement.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+      // 스토리 모드 fallback: NG0lu 또는 _3dO1K 컨테이너에서 버튼 찾기
+      const storiesMatchContainer = document.querySelector('.NG0lu') ||
+        document.querySelector('._3dO1K');
+      if (storiesMatchContainer) {
+        const storiesButtons = Array.from(storiesMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
         if (storiesButtons.length > 0) {
-          // 스토리 모드 컨테이너를 matchContainer로 사용하여 기존 로직 재사용
-          matchContainer = storiesElement;
+          console.log(`🔍 [STORIES-MATCH] 스토리 매치 컨테이너 발견, 버튼 ${storiesButtons.length}개`);
+          matchContainer = storiesMatchContainer;
         }
       }
 
+      // 마지막 fallback: 전체 페이지에서 버튼 찾기
       if (!matchContainer) {
-        return false;
+        const anyMatchButtons = document.querySelectorAll('button[data-test$="-challenge-tap-token"]');
+        if (anyMatchButtons.length > 0) {
+          console.log(`🔍 [STORIES-MATCH] 페이지 전체에서 버튼 ${anyMatchButtons.length}개 발견`);
+          matchContainer = document.body;
+        }
       }
+    }
+
+    // matchContainer가 없으면 return false
+    if (!matchContainer) {
+      console.log('⚠️ [STORIES-MATCH] 매치 컨테이너를 찾을 수 없음');
+      return false;
     }
 
     // 모든 버튼 찾기
