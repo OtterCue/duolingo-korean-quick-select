@@ -493,14 +493,14 @@ class DuolingoKoreanQuickSelect {
   handleMatchChallenge(event, key) {
     // 컨테이너 찾기 순서: --match-challenge-rows → challenge-match → stories-element
     let matchContainer = document.querySelector('[style*="--match-challenge-rows"]');
-    
+
     if (!matchContainer) {
       // Fallback: 기존 방식
       const fallbackContainer = document.querySelector('[data-test*="challenge-match"]');
       if (fallbackContainer) {
         return this.handleMatchChallengeFallback(fallbackContainer, event, key);
       }
-      
+
       // 스토리 모드 fallback: stories-element 내부에서 버튼 찾기
       const storiesElement = document.querySelector('[data-test="stories-element"]');
       if (storiesElement) {
@@ -510,7 +510,7 @@ class DuolingoKoreanQuickSelect {
           matchContainer = storiesElement;
         }
       }
-      
+
       if (!matchContainer) {
         return false;
       }
@@ -604,8 +604,8 @@ class DuolingoKoreanQuickSelect {
    * @returns {number|null} 버튼 번호 또는 null
    */
   getButtonNumber(button) {
-    const numberSpan = button.querySelector('span._3zbIX') || 
-                      button.querySelector('span[class*="_3zbIX"]');
+    const numberSpan = button.querySelector('span._3zbIX') ||
+      button.querySelector('span[class*="_3zbIX"]');
     if (numberSpan) {
       const numberText = numberSpan.textContent.trim();
       const buttonNumber = parseInt(numberText, 10);
@@ -653,7 +653,7 @@ class DuolingoKoreanQuickSelect {
 
     // 키 매핑 테이블 (keyBindings에서 생성)
     const keyMap = {};
-    
+
     // 왼쪽 열 버튼 매핑: 1→0, 2→1, 3→2, 4→3, 5→4
     for (let i = 0; i < leftButtons.length && i < 5; i++) {
       const keyNum = String(i + 1);
@@ -835,7 +835,7 @@ class DuolingoKoreanQuickSelect {
     if (nextInput) {
       this.preventEventPropagation(event);
 
-      // ✅ 치명적 수정: 유효성 검사 - 영어 매칭 추가
+      // ✅ 치명적 수정: 유효성 검사 - 영어 매칭 추가 + 서브시퀀스 지원
       const buttons = this.getWordButtons();
       const hasMatch = buttons.some(button => {
         const text = button.textContent.trim();
@@ -843,15 +843,27 @@ class DuolingoKoreanQuickSelect {
         const hasKorean = /[가-힣]/.test(text);
 
         if (lang === 'ko' || hasKorean) {
-          // 한글 단어: 초성/자모 매칭
+          // 한글 단어: 초성/자모 매칭 + 서브시퀀스
           const chosung = window.getChosung(text);
           const disassembled = window.getDisassembled(text);
-          return chosung.startsWith(nextInput) || disassembled.startsWith(nextInput);
+
+          // 1. startsWith 체크 (빠른 경로)
+          if (chosung.startsWith(nextInput) || disassembled.startsWith(nextInput)) {
+            return true;
+          }
+
+          // 2. 서브시퀀스 체크 (3글자 이상일 때만)
+          if (nextInput.length >= 3) {
+            return this.isSubsequence(nextInput, disassembled);
+          }
+
+          return false;
         } else if (isOrderTapComplete && lang === 'en') {
           // 영어 단어: 대소문자 무시하고 prefix 매칭
           return text.toLowerCase().startsWith(nextInput.toLowerCase());
         }
         return false;
+
       });
 
       if (hasMatch) {
@@ -887,6 +899,73 @@ class DuolingoKoreanQuickSelect {
     }, 200); // 에러 표시 시간도 단축
   }
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🔧 서브시퀀스 매칭 헬퍼 함수
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /**
+   * 서브시퀀스 매칭 체크
+   * 입력 문자열이 대상 문자열의 서브시퀀스인지 확인
+   * (순서는 유지하되 중간 생략 가능)
+   * 
+   * @param {string} input - 입력 문자열 (예: "ㄱㅇㅣ")
+   * @param {string} target - 대상 문자열 (예: "ㄱㅗㅇㅏㅇㅣ")
+   * @returns {boolean} 서브시퀀스이면 true
+   * 
+   * @example
+   * isSubsequence("ㄱㅇㅣ", "ㄱㅗㅇㅏㅇㅣ") // true (고양이)
+   * isSubsequence("ㄱㅣ", "ㄱㅗㅇㅏㅇㅣ")  // true (ㄱ...ㅣ)
+   * isSubsequence("ㅇㄱ", "ㄱㅗㅇㅏㅇㅣ")  // false (순서 바뀜)
+   */
+  isSubsequence(input, target) {
+    let inputIndex = 0;
+    let targetIndex = 0;
+
+    while (inputIndex < input.length && targetIndex < target.length) {
+      if (input[inputIndex] === target[targetIndex]) {
+        inputIndex++;
+      }
+      targetIndex++;
+    }
+
+    return inputIndex === input.length;
+  }
+
+  /**
+   * 서브시퀀스 매칭 점수 계산
+   * 점수가 낮을수록 더 정확한 매칭
+   * 
+   * @param {string} input - 입력 문자열
+   * @param {string} target - 대상 문자열
+   * @returns {number} 매칭 점수 (간격 합계, 낮을수록 좋음)
+   * 
+   * @example
+   * // "고양이" vs "강오의" 비교
+   * getMatchScore("ㄱㅇㅣ", "ㄱㅗㅇㅏㅇㅣ")  // 3 (고양이 - 더 좋음!)
+   * getMatchScore("ㄱㅇㅣ", "ㄱㅏㅇㅗㅇㅡㅣ") // 4 (강오의)
+   */
+  getMatchScore(input, target) {
+    let inputIndex = 0;
+    let targetIndex = 0;
+    let totalGap = 0;
+    let lastMatchPos = -1;
+
+    while (inputIndex < input.length && targetIndex < target.length) {
+      if (input[inputIndex] === target[targetIndex]) {
+        if (lastMatchPos >= 0) {
+          // 이전 매칭 위치와 현재 위치 사이의 간격 누적
+          totalGap += (targetIndex - lastMatchPos - 1);
+        }
+        lastMatchPos = targetIndex;
+        inputIndex++;
+      }
+      targetIndex++;
+    }
+
+    return totalGap;
+  }
+
+
   updateHighlight(allowAutoSelect = true) {
     this.clearHighlight();
 
@@ -913,18 +992,64 @@ class DuolingoKoreanQuickSelect {
       let isExactMatch = false;
 
       if (lang === 'ko' || hasKorean) {
-        // 한글 매칭: 기존 로직 (초성 또는 자모 분해)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 📝 한글 하이브리드 매칭 (초성 + 자모 서브시퀀스, OR 조건)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        // [Case A] 초성 매칭 (빠른 입력용)
+        // 예: "고양이" → 초성 "ㄱㅇㅇ" 추출
+        // 입력 "ㄱㅇ" → startsWith 매칭 성공 ✅
         const chosung = window.getChosung(text);
+
+        // [Case B] 자모 분해 매칭 (정밀 입력용 - 서브시퀀스)
+        // 예: "고양이" → 자모 "ㄱㅗㅇㅏㅇㅣ" 분해
+        // 기존: 입력 "ㄱㅗ" → startsWith 매칭 성공 ✅
+        // 신규: 입력 "ㄱㅇㅣ" → subsequence 매칭 성공 ✅ (중간 생략 가능!)
+        // 장점: 비슷한 초성 단어 빠르게 구분 ("고양이" vs "고래" → "ㄱㅇㅣ")
         const disassembled = window.getDisassembled(text);
 
-        if (chosung.startsWith(this.currentInput) || disassembled.startsWith(this.currentInput)) {
+        // 1단계: 빠른 매칭 (startsWith) - 기존 방식
+        const startsWithChosung = chosung.startsWith(this.currentInput);
+        const startsWithDisassembled = disassembled.startsWith(this.currentInput);
+
+        // 2단계: 유연한 매칭 (subsequence) - 신규 방식
+        // 🚨 중요: 3글자 이상 입력했을 때만 서브시퀀스 활성화!
+        // 이유: 1-2글자 입력 시 너무 많은 단어가 매칭되어 자동 선택 방해
+        // 예: "ㅍ" 입력 → "플라스틱"만 매칭되어야 함 (서브시퀀스 OFF)
+        //     "ㄱㅇㅣ" 입력 → "고양이" vs "강오의" 구분 (서브시퀀스 ON)
+        const useSubsequence = this.currentInput.length >= 3;
+        const isSubseqDisassembled = useSubsequence && this.isSubsequence(this.currentInput, disassembled);
+
+        // OR 조건: 셋 중 하나라도 매칭되면 성공
+        if (startsWithChosung || startsWithDisassembled || isSubseqDisassembled) {
           isMatch = true;
 
-          // 정확히 일치하는지 확인 (초성 전체 일치 또는 자모 전체 일치)
-          if (chosung === this.currentInput || disassembled === this.currentInput) {
+          // 매칭 점수 계산 (낮을수록 정확한 매칭)
+          let matchScore = Infinity;
+
+          if (startsWithChosung && chosung === this.currentInput) {
+            // 초성 완전 일치 - 최고 우선순위
+            matchScore = 0;
             isExactMatch = true;
+          } else if (startsWithDisassembled && disassembled === this.currentInput) {
+            // 자모 완전 일치 - 최고 우선순위
+            matchScore = 0;
+            isExactMatch = true;
+          } else if (startsWithChosung) {
+            // 초성 부분 일치 - 높은 우선순위
+            matchScore = 1;
+          } else if (startsWithDisassembled) {
+            // 자모 부분 일치 (startsWith) - 중간 우선순위
+            matchScore = 2;
+          } else if (isSubseqDisassembled) {
+            // 자모 서브시퀀스 - 낮은 우선순위이지만 간격으로 정렬
+            matchScore = 10 + this.getMatchScore(this.currentInput, disassembled);
           }
+
+          // 버튼에 점수 저장 (나중에 정렬용)
+          button.dataset.matchScore = matchScore;
         }
+
       } else if (isOrderTapComplete && lang === 'en') {
         // 영어 매칭: 대소문자 무시하고 prefix 매칭
         const lowerText = text.toLowerCase();
@@ -933,36 +1058,66 @@ class DuolingoKoreanQuickSelect {
         if (lowerText.startsWith(lowerInput)) {
           isMatch = true;
 
+          // 매칭 점수 설정
+          let matchScore = 1; // 기본 부분 일치
+
           // 정확히 일치
           if (lowerText === lowerInput) {
             isExactMatch = true;
+            matchScore = 0; // 완전 일치
           }
+
+          // 버튼에 점수 저장
+          button.dataset.matchScore = matchScore;
         }
+
       }
 
       if (isMatch) {
         matchedButtons.push(button);
+
+        // 📌 기본 하이라이트 (부분 매칭)
         button.classList.add('korean-quick-select-highlight');
 
         if (isExactMatch) {
+          // 🎯 [Case F] Exact Match 강조 스타일 적용
+          // 일반 하이라이트를 제거하고 더 강한 스타일로 교체
           button.classList.remove('korean-quick-select-highlight');
           button.classList.add('korean-quick-select-exact-match');
         }
       }
     });
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🎯 매칭 점수 기반 정렬 (낮은 점수 = 더 정확한 매칭)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 서브시퀀스 매칭 시 여러 단어가 매칭될 때,
+    // 점수가 낮은(간격이 작은) 단어를 우선 선택
+    matchedButtons.sort((a, b) => {
+      const scoreA = parseFloat(a.dataset.matchScore) || 0;
+      const scoreB = parseFloat(b.dataset.matchScore) || 0;
+      return scoreA - scoreB; // 오름차순 정렬
+    });
+
     this.highlightedButtons = matchedButtons;
 
-    // 자동 선택 로직
-    // 1. 정확히 일치하는 단어가 있거나
-    // 2. 남은 후보 단어가 딱 하나일 때 (부분 일치 자동 선택)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ✨ [Case D] 자동 선택 로직 (유니크 매칭)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 조건: 매칭된 유니크 단어가 딱 1개일 때
+    // 동작: Enter 없이 자동으로 클릭 (속도 향상)
+    // 
+    // 예시:
+    //   - 단어: "고양이", "고래", "사과"
+    //   - 입력 "ㄱㅇㅇ" → "고양이"만 매칭 → ✅ 자동 클릭!
+    //   - 입력 "ㄱ" → "고양이", "고래" 매칭 → ⏸️ 대기 (추가 입력 필요)
 
     // 🚨 allowAutoSelect가 false면 자동 선택 안 함 (Backspace 등)
     if (!allowAutoSelect) return;
 
     const allMatchedTexts = new Set(matchedButtons.map(b => b.textContent.trim()));
 
-    // 조건: 매칭된 유니크 단어가 1개여야 함
+    // [Case D 핵심] 유니크 단어가 1개 → 즉시 클릭
     if (allMatchedTexts.size === 1) {
       const targetButton = matchedButtons[0]; // 첫 번째 버튼 선택
 
