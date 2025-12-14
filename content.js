@@ -200,7 +200,9 @@ class DuolingoKoreanQuickSelect {
 
       // 2) 입력 중인 글자가 없으면 -> 선택된 단어 삭제 (취소)
       // (단어 은행이 활성화된 경우에만)
-      if (this.isActive) {
+      // 🚨 orderTapComplete 챌린지는 제외 (버튼이 이미 Selected gap에 배치된 상태로 시작됨)
+      const challengeType = this.detectChallengeType();
+      if (this.isActive && challengeType !== 'orderTapComplete') {
         const placedButtons = this.getPlacedButtons();
         if (placedButtons.length > 0) {
           this.preventEventPropagation(event);
