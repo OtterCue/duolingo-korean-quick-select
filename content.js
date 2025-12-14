@@ -566,35 +566,84 @@ class DuolingoKoreanQuickSelect {
     // 키 매핑 테이블 생성
     const keyMap = {};
 
-    // 1-5번 키: 왼쪽 열 (화면 번호 그대로 매핑)
-    ['1', '2', '3', '4', '5'].forEach(num => {
-      if (buttonNumberMap[num]) {
-        keyMap[num] = buttonNumberMap[num];
-      }
-    });
+    // 🚨 Stories Match fallback: 숫자 span이 없으면 DOM 순서 기반 매핑
+    if (Object.keys(buttonNumberMap).length === 0) {
+      console.log(`🔍 [STORIES-MATCH] 숫자 span 없음 - DOM 순서 기반 매핑 사용`);
 
-    // 6-9번 키: 오른쪽 열 (화면 번호 그대로 매핑)
-    ['6', '7', '8', '9'].forEach(num => {
-      if (buttonNumberMap[num]) {
-        keyMap[num] = buttonNumberMap[num];
-      }
-    });
+      // ul 요소로 좌/우 열 구분
+      const columns = matchContainer.querySelectorAll('ul');
+      let leftButtons = [];
+      let rightButtons = [];
 
-    // 0번 키: 10번째 버튼 (화면에는 "0"으로 표시됨)
-    if (buttonNumberMap['0']) {
-      keyMap['0'] = buttonNumberMap['0'];
+      if (columns.length >= 2) {
+        leftButtons = Array.from(columns[0].querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+        rightButtons = Array.from(columns[1].querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+        console.log(`🔍 [STORIES-MATCH] 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
+      } else {
+        // ul 구조가 없으면 전체 버튼을 반으로 나눔
+        const half = Math.ceil(allButtons.length / 2);
+        leftButtons = allButtons.slice(0, half);
+        rightButtons = allButtons.slice(half);
+        console.log(`🔍 [STORIES-MATCH] ul 없음 - 반으로 나눔: 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
+      }
+
+      // 왼쪽 열: 1-5번 키
+      leftButtons.forEach((btn, i) => {
+        if (i < 5) {
+          keyMap[String(i + 1)] = btn;
+        }
+      });
+
+      // 오른쪽 열: 6-9, 0번 키
+      rightButtons.forEach((btn, i) => {
+        if (i < 4) {
+          keyMap[String(i + 6)] = btn;
+        } else if (i === 4) {
+          keyMap['0'] = btn;
+        }
+      });
+
+      // alternates: q, w, e, r, t → 오른쪽 열
+      const altKeys = ['q', 'w', 'e', 'r', 't'];
+      rightButtons.forEach((btn, i) => {
+        if (i < altKeys.length) {
+          keyMap[altKeys[i]] = btn;
+        }
+      });
+
+      console.log(`🔍 [STORIES-MATCH] keyMap 키:`, Object.keys(keyMap));
+    } else {
+      // 숫자 span이 있는 일반 Match 챌린지
+      // 1-5번 키: 왼쪽 열 (화면 번호 그대로 매핑)
+      ['1', '2', '3', '4', '5'].forEach(num => {
+        if (buttonNumberMap[num]) {
+          keyMap[num] = buttonNumberMap[num];
+        }
+      });
+
+      // 6-9번 키: 오른쪽 열 (화면 번호 그대로 매핑)
+      ['6', '7', '8', '9'].forEach(num => {
+        if (buttonNumberMap[num]) {
+          keyMap[num] = buttonNumberMap[num];
+        }
+      });
+
+      // 0번 키: 10번째 버튼 (화면에는 "0"으로 표시됨)
+      if (buttonNumberMap['0']) {
+        keyMap['0'] = buttonNumberMap['0'];
+      }
+
+      // alternates: q, w, e, r, t → 6, 7, 8, 9, 0번 버튼
+      Object.keys(this.keyBindings.match.alternates).forEach(altKey => {
+        const targetButtonNumber = this.keyBindings.match.alternates[altKey]; // 6, 7, 8, 9, 10
+        // 10은 화면에서 "0"으로 표시됨
+        const displayNumber = targetButtonNumber === 10 ? '0' : String(targetButtonNumber);
+
+        if (buttonNumberMap[displayNumber]) {
+          keyMap[altKey] = buttonNumberMap[displayNumber];
+        }
+      });
     }
-
-    // alternates: q, w, e, r, t → 6, 7, 8, 9, 0번 버튼
-    Object.keys(this.keyBindings.match.alternates).forEach(altKey => {
-      const targetButtonNumber = this.keyBindings.match.alternates[altKey]; // 6, 7, 8, 9, 10
-      // 10은 화면에서 "0"으로 표시됨
-      const displayNumber = targetButtonNumber === 10 ? '0' : String(targetButtonNumber);
-
-      if (buttonNumberMap[displayNumber]) {
-        keyMap[altKey] = buttonNumberMap[displayNumber];
-      }
-    });
 
     // 키 입력 처리
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
