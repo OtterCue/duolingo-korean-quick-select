@@ -49,6 +49,22 @@ const COMPLEX_VOWELS = {
   'ㅢ': 'ㅡㅣ'
 };
 
+// 겹받침(복합 종성) 분해 맵
+// 예: "읽" → ㅇ + ㅣ + ㄺ → ㅇ + ㅣ + ㄹ + ㄱ
+const COMPLEX_JONGSUNG = {
+  'ㄳ': 'ㄱㅅ',
+  'ㄵ': 'ㄴㅈ',
+  'ㄶ': 'ㄴㅎ',
+  'ㄺ': 'ㄹㄱ',
+  'ㄻ': 'ㄹㅁ',
+  'ㄼ': 'ㄹㅂ',
+  'ㄽ': 'ㄹㅅ',
+  'ㄾ': 'ㄹㅌ',
+  'ㄿ': 'ㄹㅍ',
+  'ㅀ': 'ㄹㅎ',
+  'ㅄ': 'ㅂㅅ'
+};
+
 const HANGUL_START = 0xAC00;
 const HANGUL_END = 0xD7A3;
 
@@ -90,11 +106,15 @@ function getDisassembled(text) {
       }
 
       if (jongsungIndex > 0) {
-        // 종성도 복합 자음인 경우 분해할 수 있으나, 
-        // 현재 키 매핑상 종성 복합 자음(ㄳ, ㄵ 등)은 Shift 조합이 아니라 
-        // 낱자 입력(ㄱ+ㅅ, ㄴ+ㅈ)으로 처리되므로 일단 그대로 둠.
-        // 필요시 JONGSUNG_LIST 매핑 추가 가능.
-        result += JONGSUNG_LIST[jongsungIndex];
+        // 종성(받침) 처리 - 겹받침은 분해
+        const jongsung = JONGSUNG_LIST[jongsungIndex];
+        if (COMPLEX_JONGSUNG[jongsung]) {
+          // 겹받침 분해: ㄺ → ㄹㄱ, ㄻ → ㄹㅁ 등
+          result += COMPLEX_JONGSUNG[jongsung];
+        } else {
+          // 단일 받침은 그대로
+          result += jongsung;
+        }
       }
     } else {
       result += text[i];
