@@ -264,11 +264,11 @@ class DuolingoKoreanQuickSelect {
     // Stories 모드 매칭 챌린지 (match보다 먼저 체크 - 더 구체적)
     // 🚨 수정: 페이지 전체에서 stories-element와 매치 버튼을 확인
     const storiesElements = document.querySelectorAll('[data-test="stories-element"]');
-    const hasStoriesMatchButtons = document.querySelector('button[data-test$="-challenge-tap-token"]');
+    const hasStoriesMatchButtons = document.querySelector('button[data-test*="-challenge-tap-token"]');
     if (storiesElements.length > 0 && hasStoriesMatchButtons) {
       // 버튼이 stories-element 컨텍스트 내에 있는지 확인 (NG0lu 클래스는 매치 컨테이너)
-      const matchContainer = document.querySelector('.NG0lu button[data-test$="-challenge-tap-token"]') ||
-        document.querySelector('._3dO1K button[data-test$="-challenge-tap-token"]');
+      const matchContainer = document.querySelector('.NG0lu button[data-test*="-challenge-tap-token"]') ||
+        document.querySelector('._3dO1K button[data-test*="-challenge-tap-token"]');
       if (matchContainer) {
         console.log('🔍 [DETECT] storiesMatch 감지됨');
         return 'storiesMatch';
@@ -515,7 +515,7 @@ class DuolingoKoreanQuickSelect {
       const storiesMatchContainer = document.querySelector('.NG0lu') ||
         document.querySelector('._3dO1K');
       if (storiesMatchContainer) {
-        const storiesButtons = Array.from(storiesMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+        const storiesButtons = Array.from(storiesMatchContainer.querySelectorAll('button[data-test*="-challenge-tap-token"]'));
         if (storiesButtons.length > 0) {
           console.log(`🔍 [STORIES-MATCH] 스토리 매치 컨테이너 발견, 버튼 ${storiesButtons.length}개`);
           matchContainer = storiesMatchContainer;
@@ -524,7 +524,7 @@ class DuolingoKoreanQuickSelect {
 
       // 마지막 fallback: 전체 페이지에서 버튼 찾기
       if (!matchContainer) {
-        const anyMatchButtons = document.querySelectorAll('button[data-test$="-challenge-tap-token"]');
+        const anyMatchButtons = document.querySelectorAll('button[data-test*="-challenge-tap-token"]');
         if (anyMatchButtons.length > 0) {
           console.log(`🔍 [STORIES-MATCH] 페이지 전체에서 버튼 ${anyMatchButtons.length}개 발견`);
           matchContainer = document.body;
@@ -538,8 +538,8 @@ class DuolingoKoreanQuickSelect {
       return false;
     }
 
-    // 모든 버튼 찾기
-    const allButtons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+    // 모든 버튼 찾기 (🚨 *= 사용: "to call" 같은 다중 단어 버튼도 찾기 위해)
+    const allButtons = Array.from(matchContainer.querySelectorAll('button[data-test*="-challenge-tap-token"]'));
     if (allButtons.length === 0) {
       // 버튼이 없으면 fallback 시도
       const fallbackContainer = document.querySelector('[data-test*="challenge-match"]');
@@ -576,8 +576,8 @@ class DuolingoKoreanQuickSelect {
       let rightButtons = [];
 
       if (columns.length >= 2) {
-        leftButtons = Array.from(columns[0].querySelectorAll('button[data-test$="-challenge-tap-token"]'));
-        rightButtons = Array.from(columns[1].querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+        leftButtons = Array.from(columns[0].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
+        rightButtons = Array.from(columns[1].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
         console.log(`🔍 [STORIES-MATCH] 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
       } else {
         // ul 구조가 없으면 전체 버튼을 반으로 나눔
@@ -703,12 +703,12 @@ class DuolingoKoreanQuickSelect {
 
     if (columns.length >= 2) {
       // ul 태그로 좌/우 열 구분 가능
-      leftButtons = Array.from(columns[0].querySelectorAll('button[data-test$="-challenge-tap-token"]'));
-      rightButtons = Array.from(columns[1].querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+      leftButtons = Array.from(columns[0].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
+      rightButtons = Array.from(columns[1].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
       buttons = [...leftButtons, ...rightButtons];
     } else {
       // ul 구조가 없으면 전체 버튼을 DOM 순서대로 사용 (왼쪽→오른쪽 가정)
-      buttons = Array.from(matchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+      buttons = Array.from(matchContainer.querySelectorAll('button[data-test*="-challenge-tap-token"]'));
       // DOM 순서상 앞의 5개가 왼쪽, 뒤의 5개가 오른쪽이라고 가정
       if (buttons.length >= 10) {
         leftButtons = buttons.slice(0, 5);
@@ -781,7 +781,7 @@ class DuolingoKoreanQuickSelect {
     const listenMatchContainer = document.querySelector('[data-test*="challenge-listenMatch"]');
     if (!listenMatchContainer) return false;
 
-    const buttons = Array.from(listenMatchContainer.querySelectorAll('button[data-test$="-challenge-tap-token"]'));
+    const buttons = Array.from(listenMatchContainer.querySelectorAll('button[data-test*="-challenge-tap-token"]'));
 
     // 키 매핑 테이블 (keyBindings에서 생성)
     const keyMap = {};
@@ -886,13 +886,15 @@ class DuolingoKoreanQuickSelect {
 
     let nextInput = null;
 
-    // ✅ 치명적 수정: orderTapComplete에서는 알파벳을 KEY_MAP보다 먼저 처리
+    // ✅ 치명적 수정: orderTapComplete 또는 따옴표 영어 단어가 있을 때 알파벳을 KEY_MAP보다 먼저 처리
     const challengeType = this.detectChallengeType();
     const isOrderTapComplete = challengeType === 'orderTapComplete';
+    // 🚨 storiesMatch에서는 q,w,e,r,t가 Match 단축키로 사용되므로 영어 처리 비활성화
+    const hasQuotedEnglish = challengeType !== 'storiesMatch' && this.hasQuotedEnglishWords();
 
-    if (isOrderTapComplete && /^[a-zA-Z]$/.test(key)) {
-      // orderTapComplete + 알파벳 → 그대로 사용 (KEY_MAP 변환 안 함)
-      nextInput = this.currentInput + key;
+    if ((isOrderTapComplete || hasQuotedEnglish) && /^[a-zA-Z]$/.test(key)) {
+      // orderTapComplete 또는 따옴표 영어 단어 → 알파벳 그대로 사용 (KEY_MAP 변환 안 함)
+      nextInput = this.currentInput + key.toLowerCase();
     }
     // 영어 키 → 한글 자모 변환
     else if (window.KEY_MAP && window.KEY_MAP[key]) {
@@ -929,9 +931,10 @@ class DuolingoKoreanQuickSelect {
           }
 
           return false;
-        } else if (isOrderTapComplete && lang === 'en') {
-          // 영어 단어: 대소문자 무시하고 prefix 매칭
-          return text.toLowerCase().startsWith(nextInput.toLowerCase());
+        } else if ((isOrderTapComplete || hasQuotedEnglish) && lang === 'en') {
+          // 영어 단어: 알파벳만 추출해서 prefix 매칭 (따옴표 무시)
+          const textAlpha = this.extractAlphabetOnly(text);
+          return textAlpha.startsWith(nextInput.toLowerCase());
         }
         return false;
 
@@ -968,6 +971,43 @@ class DuolingoKoreanQuickSelect {
         this.inputDisplay.classList.remove('visible');
       }
     }, 200); // 에러 표시 시간도 단축
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🔧 영어 따옴표 단어 헬퍼 함수
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /**
+   * word-bank에 따옴표(') 포함된 영어 단어가 있는지 확인
+   * 🚨 중요: getWordButtons()를 호출하면 순환 의존성! 직접 조회해야 함
+   * @returns {boolean} 따옴표 포함 영어 단어가 있으면 true
+   */
+  hasQuotedEnglishWords() {
+    // 🚨 getWordButtons() 호출하면 안 됨! (그 함수가 여기를 간접 참조함)
+    // 직접 word-bank에서 버튼 조회
+    const wordBank = document.querySelector('[data-test="word-bank"]');
+    if (!wordBank) return false;
+
+    const buttons = wordBank.querySelectorAll('button');
+    return Array.from(buttons).some(btn => {
+      const text = btn.textContent.trim();
+      const lang = btn.getAttribute('lang');
+      // 영어 단어이면서 따옴표를 포함
+      return lang === 'en' && text.includes("'");
+    });
+  }
+
+  /**
+   * 문자열에서 알파벳만 추출 (소문자로 변환)
+   * @param {string} str - 원본 문자열
+   * @returns {string} 알파벳만 포함된 소문자 문자열
+   * @example
+   * extractAlphabetOnly("I'm") // "im"
+   * extractAlphabetOnly("don't") // "dont"
+   * extractAlphabetOnly("'re") // "re"
+   */
+  extractAlphabetOnly(str) {
+    return str.replace(/[^a-zA-Z]/g, '').toLowerCase();
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1052,6 +1092,7 @@ class DuolingoKoreanQuickSelect {
 
     const challengeType = this.detectChallengeType();
     const isOrderTapComplete = challengeType === 'orderTapComplete';
+    const hasQuotedEnglish = this.hasQuotedEnglishWords();
     const matchedButtons = [];
 
     buttons.forEach(button => {
@@ -1121,19 +1162,19 @@ class DuolingoKoreanQuickSelect {
           button.dataset.matchScore = matchScore;
         }
 
-      } else if (isOrderTapComplete && lang === 'en') {
-        // 영어 매칭: 대소문자 무시하고 prefix 매칭
-        const lowerText = text.toLowerCase();
-        const lowerInput = this.currentInput.toLowerCase();
+      } else if ((isOrderTapComplete || hasQuotedEnglish) && lang === 'en') {
+        // 영어 매칭: 알파벳만 추출해서 prefix 매칭 (따옴표 무시)
+        const textAlpha = this.extractAlphabetOnly(text);
+        const inputAlpha = this.currentInput.toLowerCase();
 
-        if (lowerText.startsWith(lowerInput)) {
+        if (textAlpha.startsWith(inputAlpha)) {
           isMatch = true;
 
           // 매칭 점수 설정
           let matchScore = 1; // 기본 부분 일치
 
-          // 정확히 일치
-          if (lowerText === lowerInput) {
+          // 정확히 일치 (알파벳만 기준)
+          if (textAlpha === inputAlpha) {
             isExactMatch = true;
             matchScore = 0; // 완전 일치
           }
@@ -1263,9 +1304,26 @@ class DuolingoKoreanQuickSelect {
         return true;
       }
 
-      // orderTapComplete에서만 영어 버튼 포함
-      if (isOrderTapComplete && lang === 'en' && hasEnglish) {
-        return true;
+      // orderTapComplete 또는 따옴표 포함 영어 단어가 있는 경우 영어 버튼 포함
+      // 🚨 주의: hasQuotedEnglishWords() 호출하면 무한루프! (그 함수에서 getWordButtons 호출)
+      // 대신 word-bank에서 직접 따옴표 단어 존재 여부 체크
+      if (lang === 'en' && hasEnglish) {
+        // orderTapComplete면 모든 영어 버튼 포함
+        if (isOrderTapComplete) {
+          return true;
+        }
+
+        // 🚨 수정: word-bank에 따옴표 단어가 하나라도 있으면 모든 영어 버튼 포함
+        // (영어 처리 모드가 활성화되면 일반 영어 단어도 필요)
+        if (wordBank) {
+          const allBtns = wordBank.querySelectorAll('button');
+          const hasAnyQuotedWord = Array.from(allBtns).some(b =>
+            b.getAttribute('lang') === 'en' && b.textContent.includes("'")
+          );
+          if (hasAnyQuotedWord) {
+            return true;
+          }
+        }
       }
 
       return false;
