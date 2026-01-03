@@ -199,10 +199,8 @@ class DuolingoKoreanQuickSelect {
       }
 
       // 2) 입력 중인 글자가 없으면 -> 선택된 단어 삭제 (취소)
-      // (단어 은행이 활성화된 경우에만)
-      // 🚨 orderTapComplete 챌린지는 제외 (버튼이 이미 Selected gap에 배치된 상태로 시작됨)
-      const challengeType = this.detectChallengeType();
-      if (this.isActive && challengeType !== 'orderTapComplete') {
+      // (단어 은행이 활성화된 경우)
+      if (this.isActive) {
         const placedButtons = this.getPlacedButtons();
         if (placedButtons.length > 0) {
           this.preventEventPropagation(event);
@@ -897,8 +895,14 @@ class DuolingoKoreanQuickSelect {
       nextInput = this.currentInput + key.toLowerCase();
     }
     // 영어 키 → 한글 자모 변환
-    else if (window.KEY_MAP && window.KEY_MAP[key]) {
-      nextInput = this.currentInput + window.KEY_MAP[key];
+    // 🚨 수정: 대문자 키도 처리 (대문자 우선 체크 → 소문자 폴백)
+    // 예: Shift+Q → 'Q' → ㅃ, 일반 q → 'q' → ㅂ
+    // 예: 대문자 'S'로 들어와도 's' → ㄴ으로 변환
+    else if (window.KEY_MAP) {
+      const koreanChar = window.KEY_MAP[key] || window.KEY_MAP[key.toLowerCase()];
+      if (koreanChar) {
+        nextInput = this.currentInput + koreanChar;
+      }
     }
     // 한글 자모 직접 입력
     else if (window.CHOSUNG_LIST && (window.CHOSUNG_LIST.includes(key) || window.JUNGSUNG_LIST.includes(key))) {
