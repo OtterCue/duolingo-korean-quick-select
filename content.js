@@ -890,18 +890,45 @@ class DuolingoKoreanQuickSelect {
     // 🚨 storiesMatch에서는 q,w,e,r,t가 Match 단축키로 사용되므로 영어 처리 비활성화
     const hasQuotedEnglish = challengeType !== 'storiesMatch' && this.hasQuotedEnglishWords();
 
-    if ((isOrderTapComplete || hasQuotedEnglish) && /^[a-zA-Z]$/.test(key)) {
+    // 🚨 영어 단어가 word-bank에 있는지 확인 (한글만 있으면 한글 입력 사용)
+    const hasEnglishWords = this.hasEnglishWordsInBank();
+
+    // 영어 입력 조건: (orderTapComplete 또는 따옴표 영어) AND 영어 단어가 실제로 있음
+    if ((isOrderTapComplete || hasQuotedEnglish) && hasEnglishWords && /^[a-zA-Z]$/.test(key)) {
       // orderTapComplete 또는 따옴표 영어 단어 → 알파벳 그대로 사용 (KEY_MAP 변환 안 함)
+      // Caps Lock 상관없이 소문자로 통일
       nextInput = this.currentInput + key.toLowerCase();
     }
     // 영어 키 → 한글 자모 변환
-    // 🚨 수정: 대문자 키도 처리 (대문자 우선 체크 → 소문자 폴백)
-    // 예: Shift+Q → 'Q' → ㅃ, 일반 q → 'q' → ㅂ
-    // 예: 대문자 'S'로 들어와도 's' → ㄴ으로 변환
+    // 🚨 Caps Lock 무시: 물리적 키(event.code) + Shift 상태만 고려
+    // - 물리 q + Shift 없음 → 'q' → ㅂ
+    // - 물리 q + Shift 있음 → 'Q' → ㅃ (쌍자음)
+    // - Caps Lock은 완전히 무시됨!
     else if (window.KEY_MAP) {
-      const koreanChar = window.KEY_MAP[key] || window.KEY_MAP[key.toLowerCase()];
-      if (koreanChar) {
-        nextInput = this.currentInput + koreanChar;
+      // event.code에서 물리적 키 추출 (예: 'KeyQ' → 'q', 'KeyS' → 's')
+      const code = event.code;
+      let physicalKey = null;
+
+      if (code && code.startsWith('Key')) {
+        // 'KeyQ' → 'q' (소문자)
+        physicalKey = code.slice(3).toLowerCase();
+      }
+
+      if (physicalKey) {
+        // Shift 상태에 따라 대소문자 결정 (Caps Lock 무시!)
+        const mappingKey = event.shiftKey ? physicalKey.toUpperCase() : physicalKey;
+        const koreanChar = window.KEY_MAP[mappingKey];
+
+        if (koreanChar) {
+          nextInput = this.currentInput + koreanChar;
+          console.log(`🔤 [KOREAN] 물리키: ${physicalKey}, Shift: ${event.shiftKey}, 매핑: ${mappingKey} → ${koreanChar}`);
+        }
+      } else {
+        // event.code가 없거나 'Key'로 시작하지 않는 경우 기존 방식 폴백
+        const koreanChar = window.KEY_MAP[key] || window.KEY_MAP[key.toLowerCase()];
+        if (koreanChar) {
+          nextInput = this.currentInput + koreanChar;
+        }
       }
     }
     // 한글 자모 직접 입력
@@ -998,6 +1025,22 @@ class DuolingoKoreanQuickSelect {
       const lang = btn.getAttribute('lang');
       // 영어 단어이면서 따옴표를 포함
       return lang === 'en' && text.includes("'");
+    });
+  }
+
+  /**
+   * word-bank에 영어 단어(lang="en")가 있는지 확인
+   * 🚨 Caps Lock 문제 해결: 한글만 있으면 한글 입력 사용
+   * @returns {boolean} 영어 단어가 있으면 true
+   */
+  hasEnglishWordsInBank() {
+    const wordBank = document.querySelector('[data-test="word-bank"]');
+    if (!wordBank) return false;
+
+    const buttons = wordBank.querySelectorAll('button');
+    return Array.from(buttons).some(btn => {
+      const lang = btn.getAttribute('lang');
+      return lang === 'en';
     });
   }
 
