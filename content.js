@@ -67,6 +67,47 @@ class DuolingoKoreanQuickSelect {
       }
     };
 
+    // Korean synonym groups (bidirectional), applied only to Korean-word matching.
+    this.koreanSynonymGroups = [
+      ['우리', '저희'],
+      ['우리는', '저희는', '우린', '저흰'],
+      ['우리가', '저희가'],
+      ['우리를', '저희를', '우릴', '저흴'],
+      ['우리의', '저희의'],
+      ['우리도', '저희도'],
+
+      ['나', '저'],
+      ['나는', '저는', '난', '전'],
+      ['내가', '제가'],
+      ['나를', '저를'],
+      ['나의', '저의'],
+      ['나도', '저도'],
+      ['내', '제'],
+
+      ['너', '당신'],
+      ['너는', '당신은', '넌'],
+      ['네가', '당신이'],
+      ['너를', '당신을'],
+      ['너의', '당신의'],
+      ['너도', '당신도'],
+
+      ['너희', '당신들'],
+      ['너희는', '당신들은'],
+      ['너희가', '당신들이'],
+      ['너희를', '당신들을'],
+      ['너희의', '당신들의'],
+      ['너희도', '당신들도'],
+
+      ['이거', '이것'],
+      ['그거', '그것'],
+      ['저거', '저것'],
+
+      ['뭐', '무엇'],
+      ['뭘', '무엇을'],
+      ['뭐가', '무엇이']
+    ];
+    this.koreanSynonymMap = this.buildSynonymMap(this.koreanSynonymGroups);
+
     console.log('🎯 Duolingo Korean Quick Select 초기화 중...');
     console.log('💡 하이브리드 매칭 모드 (초성 + 자모)');
 
@@ -948,20 +989,11 @@ class DuolingoKoreanQuickSelect {
 
         if (lang === 'ko' || hasKorean) {
           // 한글 단어: 초성/자모 매칭 + 서브시퀀스
-          const chosung = window.getChosung(text);
-          const disassembled = window.getDisassembled(text);
-
-          // 1. startsWith 체크 (빠른 경로)
-          if (chosung.startsWith(nextInput) || disassembled.startsWith(nextInput)) {
-            return true;
-          }
-
-          // 2. 서브시퀀스 체크 (3글자 이상일 때만)
-          if (nextInput.length >= 3) {
-            return this.isSubsequence(nextInput, disassembled);
-          }
-
-          return false;
+          const variants = this.getKoreanTextVariants(text);
+          return variants.some((variant, index) => {
+            const result = this.evaluateKoreanMatch(nextInput, variant, index !== 0);
+            return !!result;
+          });
         } else if ((isOrderTapComplete || hasQuotedEnglish) && lang === 'en') {
           // 영어 단어: 알파벳만 추출해서 prefix 매칭 (따옴표 무시)
           const textAlpha = this.extractAlphabetOnly(text);
@@ -1005,7 +1037,7 @@ class DuolingoKoreanQuickSelect {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 🔧 영어 따옴표 단어 헬퍼 함수
+  // 🔧 동의어/영어 보조 헬퍼 함수
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   /**
@@ -1013,6 +1045,84 @@ class DuolingoKoreanQuickSelect {
    * 🚨 중요: getWordButtons()를 호출하면 순환 의존성! 직접 조회해야 함
    * @returns {boolean} 따옴표 포함 영어 단어가 있으면 true
    */
+  buildSynonymMap(groups) {
+    const synonymMap = new Map();
+
+    groups.forEach(group => {
+      const terms = Array.from(new Set(
+        group
+          .map(term => (term || '').trim())
+          .filter(Boolean)
+      ));
+
+      terms.forEach(term => {
+        if (!synonymMap.has(term)) {
+          synonymMap.set(term, new Set());
+        }
+      });
+
+      terms.forEach(term => {
+        const linked = synonymMap.get(term);
+        terms.forEach(other => {
+          if (other !== term) linked.add(other);
+        });
+      });
+    });
+
+    return synonymMap;
+  }
+
+  getKoreanTextVariants(text) {
+    const base = (text || '').trim();
+    if (!base) return [];
+
+    const variants = new Set([base]);
+    const synonyms = this.koreanSynonymMap.get(base);
+    if (synonyms) {
+      synonyms.forEach(term => variants.add(term));
+    }
+    return Array.from(variants);
+  }
+
+  evaluateKoreanMatch(input, candidate, isAlias = false) {
+    const chosung = window.getChosung(candidate);
+    const disassembled = window.getDisassembled(candidate);
+
+    const startsWithChosung = chosung.startsWith(input);
+    const startsWithDisassembled = disassembled.startsWith(input);
+    const useSubsequence = input.length >= 3;
+    const isSubseqDisassembled = useSubsequence && this.isSubsequence(input, disassembled);
+
+    if (!startsWithChosung && !startsWithDisassembled && !isSubseqDisassembled) {
+      return null;
+    }
+
+    let score = Infinity;
+    let isExactMatch = false;
+
+    if (startsWithChosung && chosung === input) {
+      score = 0;
+      isExactMatch = true;
+    } else if (startsWithDisassembled && disassembled === input) {
+      score = 0;
+      isExactMatch = true;
+    } else if (startsWithChosung) {
+      score = 1;
+    } else if (startsWithDisassembled) {
+      score = 2;
+    } else if (isSubseqDisassembled) {
+      score = 10 + this.getMatchScore(input, disassembled);
+    }
+
+    if (isAlias) {
+      // Ensure original text matches always sort ahead of alias matches.
+      score += 1000;
+      isExactMatch = false;
+    }
+
+    return { score, isExactMatch };
+  }
+
   hasQuotedEnglishWords() {
     // 🚨 getWordButtons() 호출하면 안 됨! (그 함수가 여기를 간접 참조함)
     // 직접 word-bank에서 버튼 조회
@@ -1151,62 +1261,22 @@ class DuolingoKoreanQuickSelect {
       let isExactMatch = false;
 
       if (lang === 'ko' || hasKorean) {
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 📝 한글 하이브리드 매칭 (초성 + 자모 서브시퀀스, OR 조건)
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const variants = this.getKoreanTextVariants(text);
+        let bestKoreanMatch = null;
 
-        // [Case A] 초성 매칭 (빠른 입력용)
-        // 예: "고양이" → 초성 "ㄱㅇㅇ" 추출
-        // 입력 "ㄱㅇ" → startsWith 매칭 성공 ✅
-        const chosung = window.getChosung(text);
+        variants.forEach((variant, index) => {
+          const result = this.evaluateKoreanMatch(this.currentInput, variant, index !== 0);
+          if (!result) return;
 
-        // [Case B] 자모 분해 매칭 (정밀 입력용 - 서브시퀀스)
-        // 예: "고양이" → 자모 "ㄱㅗㅇㅏㅇㅣ" 분해
-        // 기존: 입력 "ㄱㅗ" → startsWith 매칭 성공 ✅
-        // 신규: 입력 "ㄱㅇㅣ" → subsequence 매칭 성공 ✅ (중간 생략 가능!)
-        // 장점: 비슷한 초성 단어 빠르게 구분 ("고양이" vs "고래" → "ㄱㅇㅣ")
-        const disassembled = window.getDisassembled(text);
-
-        // 1단계: 빠른 매칭 (startsWith) - 기존 방식
-        const startsWithChosung = chosung.startsWith(this.currentInput);
-        const startsWithDisassembled = disassembled.startsWith(this.currentInput);
-
-        // 2단계: 유연한 매칭 (subsequence) - 신규 방식
-        // 🚨 중요: 3글자 이상 입력했을 때만 서브시퀀스 활성화!
-        // 이유: 1-2글자 입력 시 너무 많은 단어가 매칭되어 자동 선택 방해
-        // 예: "ㅍ" 입력 → "플라스틱"만 매칭되어야 함 (서브시퀀스 OFF)
-        //     "ㄱㅇㅣ" 입력 → "고양이" vs "강오의" 구분 (서브시퀀스 ON)
-        const useSubsequence = this.currentInput.length >= 3;
-        const isSubseqDisassembled = useSubsequence && this.isSubsequence(this.currentInput, disassembled);
-
-        // OR 조건: 셋 중 하나라도 매칭되면 성공
-        if (startsWithChosung || startsWithDisassembled || isSubseqDisassembled) {
-          isMatch = true;
-
-          // 매칭 점수 계산 (낮을수록 정확한 매칭)
-          let matchScore = Infinity;
-
-          if (startsWithChosung && chosung === this.currentInput) {
-            // 초성 완전 일치 - 최고 우선순위
-            matchScore = 0;
-            isExactMatch = true;
-          } else if (startsWithDisassembled && disassembled === this.currentInput) {
-            // 자모 완전 일치 - 최고 우선순위
-            matchScore = 0;
-            isExactMatch = true;
-          } else if (startsWithChosung) {
-            // 초성 부분 일치 - 높은 우선순위
-            matchScore = 1;
-          } else if (startsWithDisassembled) {
-            // 자모 부분 일치 (startsWith) - 중간 우선순위
-            matchScore = 2;
-          } else if (isSubseqDisassembled) {
-            // 자모 서브시퀀스 - 낮은 우선순위이지만 간격으로 정렬
-            matchScore = 10 + this.getMatchScore(this.currentInput, disassembled);
+          if (!bestKoreanMatch || result.score < bestKoreanMatch.score) {
+            bestKoreanMatch = result;
           }
+        });
 
-          // 버튼에 점수 저장 (나중에 정렬용)
-          button.dataset.matchScore = matchScore;
+        if (bestKoreanMatch) {
+          isMatch = true;
+          isExactMatch = bestKoreanMatch.isExactMatch;
+          button.dataset.matchScore = bestKoreanMatch.score;
         }
 
       } else if ((isOrderTapComplete || hasQuotedEnglish) && lang === 'en') {
