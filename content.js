@@ -225,7 +225,7 @@ class DuolingoKoreanQuickSelect {
     // 3. 글로벌 단축키 (ESC)
     if (this.handleGlobalShortcuts(event, key)) return;
 
-    // [NEW] Backspace/Delete 전역 처리 (최우선 순위로 격상)
+    // 4. Backspace/Delete 전역 처리
     if (key === 'Backspace' || key === 'Delete') {
       // 1) 입력 중인 글자가 있으면 지움
       if (this.currentInput.length > 0) {
@@ -256,14 +256,14 @@ class DuolingoKoreanQuickSelect {
       return;
     }
 
-    // 4. 일반 오디오 단축키 (1, 2) - 입력 필드 아닐 때만
+    // 5. 일반 오디오 단축키 (1, 2) - 입력 필드 아닐 때만
     // (Ctrl 키가 눌리지 않았을 때만 동작하도록 내부에서 체크함)
     if (this.handleAudioShortcuts(event, key)) return;
 
-    // 5. 챌린지별 단축키 (Match, Listen Match)
+    // 6. 챌린지별 단축키 (Match, Listen Match)
     if (this.handleChallengeShortcuts(event, key)) return;
 
-    // 6. 한글 입력 (word-bank 필요)
+    // 7. 한글 입력 (word-bank 필요)
     if (this.isActive) {
       this.handleKoreanInput(event, key);
     }
@@ -1089,6 +1089,22 @@ class DuolingoKoreanQuickSelect {
     return Array.from(variants);
   }
 
+  /**
+   * 영어 버튼 텍스트와 입력값 prefix 매칭
+   * @param {string} input - 현재 입력값
+   * @param {string} buttonText - 버튼 텍스트 (따옴표 포함 가능)
+   * @returns {{ isMatch: boolean, isExactMatch?: boolean, score?: number }}
+   */
+  evaluateEnglishMatch(input, buttonText) {
+    const textAlpha = this.extractAlphabetOnly(buttonText);
+    const inputAlpha = input.toLowerCase();
+    if (textAlpha.startsWith(inputAlpha)) {
+      const isExact = (textAlpha === inputAlpha);
+      return { isMatch: true, isExactMatch: isExact, score: isExact ? 0 : 1 };
+    }
+    return { isMatch: false };
+  }
+
   evaluateKoreanMatch(input, candidate, isAlias = false) {
     const chosung = window.getChosung(candidate);
     const disassembled = window.getDisassembled(candidate);
@@ -1286,23 +1302,11 @@ class DuolingoKoreanQuickSelect {
 
       } else if ((isOrderTapComplete || hasQuotedEnglish) && lang === 'en') {
         // 영어 매칭: 알파벳만 추출해서 prefix 매칭 (따옴표 무시)
-        const textAlpha = this.extractAlphabetOnly(text);
-        const inputAlpha = this.currentInput.toLowerCase();
-
-        if (textAlpha.startsWith(inputAlpha)) {
+        const engResult = this.evaluateEnglishMatch(this.currentInput, text);
+        if (engResult.isMatch) {
           isMatch = true;
-
-          // 매칭 점수 설정
-          let matchScore = 1; // 기본 부분 일치
-
-          // 정확히 일치 (알파벳만 기준)
-          if (textAlpha === inputAlpha) {
-            isExactMatch = true;
-            matchScore = 0; // 완전 일치
-          }
-
-          // 버튼에 점수 저장
-          button.dataset.matchScore = matchScore;
+          isExactMatch = engResult.isExactMatch;
+          button.dataset.matchScore = engResult.score;
         }
 
       }
