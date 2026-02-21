@@ -22,6 +22,7 @@
       "js": [
         "hangul.js",
         "korean-matcher.js",
+        "match-utils.js",
         "content.js"
       ],
       "css": [
