@@ -293,6 +293,15 @@ class DuolingoKoreanQuickSelect {
   }
 
   /**
+   * 버튼 클릭 시각적 피드백 (살짝 눌리는 애니메이션)
+   * @param {HTMLElement} button - 피드백을 적용할 버튼
+   */
+  applyClickFeedback(button) {
+    button.style.transform = 'scale(0.95)';
+    setTimeout(() => { button.style.transform = 'scale(1)'; }, 100);
+  }
+
+  /**
    * 현재 챌린지 타입 감지
    * @returns {string} 챌린지 타입 ('listenTap', 'match', 'listenMatch', 'listenIsolation', 'unknown')
    */
@@ -696,8 +705,7 @@ class DuolingoKoreanQuickSelect {
         targetButton.click();
 
         // 시각적 피드백
-        targetButton.style.transform = 'scale(0.95)';
-        setTimeout(() => targetButton.style.transform = 'scale(1)', 100);
+        this.applyClickFeedback(targetButton);
 
         event.preventDefault();
         event.stopPropagation();
@@ -798,8 +806,7 @@ class DuolingoKoreanQuickSelect {
         buttons[index].click();
 
         // 시각적 피드백
-        buttons[index].style.transform = 'scale(0.95)';
-        setTimeout(() => buttons[index].style.transform = 'scale(1)', 100);
+        this.applyClickFeedback(buttons[index]);
 
         event.preventDefault();
         event.stopPropagation();
@@ -843,8 +850,7 @@ class DuolingoKoreanQuickSelect {
         buttons[index].click();
 
         // 시각적 피드백
-        buttons[index].style.transform = 'scale(0.95)';
-        setTimeout(() => buttons[index].style.transform = 'scale(1)', 100);
+        this.applyClickFeedback(buttons[index]);
 
         event.preventDefault();
         event.stopPropagation();
@@ -887,8 +893,7 @@ class DuolingoKoreanQuickSelect {
       targetButton.click();
 
       // 시각적 피드백
-      targetButton.style.transform = 'scale(0.95)';
-      setTimeout(() => targetButton.style.transform = 'scale(1)', 100);
+      this.applyClickFeedback(targetButton);
 
       event.preventDefault();
       event.stopPropagation();
