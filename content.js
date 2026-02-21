@@ -106,7 +106,7 @@ class DuolingoKoreanQuickSelect {
       ['뭘', '무엇을'],
       ['뭐가', '무엇이']
     ];
-    this.koreanSynonymMap = this.buildSynonymMap(this.koreanSynonymGroups);
+    this.koreanSynonymMap = buildSynonymMap(this.koreanSynonymGroups);
 
     console.log('🎯 Duolingo Korean Quick Select 초기화 중...');
     console.log('💡 하이브리드 매칭 모드 (초성 + 자모)');
@@ -964,12 +964,12 @@ class DuolingoKoreanQuickSelect {
           // 한글 단어: 초성/자모 매칭 + 서브시퀀스
           const variants = this.getKoreanTextVariants(text);
           return variants.some((variant, index) => {
-            const result = this.evaluateKoreanMatch(nextInput, variant, index !== 0);
+            const result = evaluateKoreanMatch(nextInput, variant, index !== 0);
             return !!result;
           });
         } else if ((isOrderTapComplete || hasQuotedEnglish) && lang === 'en') {
           // 영어 단어: 알파벳만 추출해서 prefix 매칭 (따옴표 무시)
-          const textAlpha = this.extractAlphabetOnly(text);
+          const textAlpha = extractAlphabetOnly(text);
           return textAlpha.startsWith(nextInput.toLowerCase());
         }
         return false;
@@ -1013,38 +1013,6 @@ class DuolingoKoreanQuickSelect {
   // 🔧 동의어/영어 보조 헬퍼 함수
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  /**
-   * word-bank에 따옴표(') 포함된 영어 단어가 있는지 확인
-   * 🚨 중요: getWordButtons()를 호출하면 순환 의존성! 직접 조회해야 함
-   * @returns {boolean} 따옴표 포함 영어 단어가 있으면 true
-   */
-  buildSynonymMap(groups) {
-    const synonymMap = new Map();
-
-    groups.forEach(group => {
-      const terms = Array.from(new Set(
-        group
-          .map(term => (term || '').trim())
-          .filter(Boolean)
-      ));
-
-      terms.forEach(term => {
-        if (!synonymMap.has(term)) {
-          synonymMap.set(term, new Set());
-        }
-      });
-
-      terms.forEach(term => {
-        const linked = synonymMap.get(term);
-        terms.forEach(other => {
-          if (other !== term) linked.add(other);
-        });
-      });
-    });
-
-    return synonymMap;
-  }
-
   getKoreanTextVariants(text) {
     const base = (text || '').trim();
     if (!base) return [];
@@ -1055,61 +1023,6 @@ class DuolingoKoreanQuickSelect {
       synonyms.forEach(term => variants.add(term));
     }
     return Array.from(variants);
-  }
-
-  /**
-   * 영어 버튼 텍스트와 입력값 prefix 매칭
-   * @param {string} input - 현재 입력값
-   * @param {string} buttonText - 버튼 텍스트 (따옴표 포함 가능)
-   * @returns {{ isMatch: boolean, isExactMatch?: boolean, score?: number }}
-   */
-  evaluateEnglishMatch(input, buttonText) {
-    const textAlpha = this.extractAlphabetOnly(buttonText);
-    const inputAlpha = input.toLowerCase();
-    if (textAlpha.startsWith(inputAlpha)) {
-      const isExact = (textAlpha === inputAlpha);
-      return { isMatch: true, isExactMatch: isExact, score: isExact ? 0 : 1 };
-    }
-    return { isMatch: false };
-  }
-
-  evaluateKoreanMatch(input, candidate, isAlias = false) {
-    const chosung = window.getChosung(candidate);
-    const disassembled = window.getDisassembled(candidate);
-
-    const startsWithChosung = chosung.startsWith(input);
-    const startsWithDisassembled = disassembled.startsWith(input);
-    const useSubsequence = input.length >= 3;
-    const isSubseqDisassembled = useSubsequence && this.isSubsequence(input, disassembled);
-
-    if (!startsWithChosung && !startsWithDisassembled && !isSubseqDisassembled) {
-      return null;
-    }
-
-    let score = Infinity;
-    let isExactMatch = false;
-
-    if (startsWithChosung && chosung === input) {
-      score = 0;
-      isExactMatch = true;
-    } else if (startsWithDisassembled && disassembled === input) {
-      score = 0;
-      isExactMatch = true;
-    } else if (startsWithChosung) {
-      score = 1;
-    } else if (startsWithDisassembled) {
-      score = 2;
-    } else if (isSubseqDisassembled) {
-      score = 10 + this.getMatchScore(input, disassembled);
-    }
-
-    if (isAlias) {
-      // Ensure original text matches always sort ahead of alias matches.
-      score += 1000;
-      isExactMatch = false;
-    }
-
-    return { score, isExactMatch };
   }
 
   hasQuotedEnglishWords() {
@@ -1143,86 +1056,6 @@ class DuolingoKoreanQuickSelect {
     });
   }
 
-  /**
-   * 문자열에서 알파벳만 추출 (소문자로 변환)
-   * @param {string} str - 원본 문자열
-   * @returns {string} 알파벳만 포함된 소문자 문자열
-   * @example
-   * extractAlphabetOnly("I'm") // "im"
-   * extractAlphabetOnly("don't") // "dont"
-   * extractAlphabetOnly("'re") // "re"
-   */
-  extractAlphabetOnly(str) {
-    return str.replace(/[^a-zA-Z]/g, '').toLowerCase();
-  }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 🔧 서브시퀀스 매칭 헬퍼 함수
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  /**
-   * 서브시퀀스 매칭 체크
-   * 입력 문자열이 대상 문자열의 서브시퀀스인지 확인
-   * (순서는 유지하되 중간 생략 가능)
-   * 
-   * @param {string} input - 입력 문자열 (예: "ㄱㅇㅣ")
-   * @param {string} target - 대상 문자열 (예: "ㄱㅗㅇㅏㅇㅣ")
-   * @returns {boolean} 서브시퀀스이면 true
-   * 
-   * @example
-   * isSubsequence("ㄱㅇㅣ", "ㄱㅗㅇㅏㅇㅣ") // true (고양이)
-   * isSubsequence("ㄱㅣ", "ㄱㅗㅇㅏㅇㅣ")  // true (ㄱ...ㅣ)
-   * isSubsequence("ㅇㄱ", "ㄱㅗㅇㅏㅇㅣ")  // false (순서 바뀜)
-   */
-  isSubsequence(input, target) {
-    let inputIndex = 0;
-    let targetIndex = 0;
-
-    while (inputIndex < input.length && targetIndex < target.length) {
-      if (input[inputIndex] === target[targetIndex]) {
-        inputIndex++;
-      }
-      targetIndex++;
-    }
-
-    return inputIndex === input.length;
-  }
-
-  /**
-   * 서브시퀀스 매칭 점수 계산
-   * 점수가 낮을수록 더 정확한 매칭
-   * 
-   * @param {string} input - 입력 문자열
-   * @param {string} target - 대상 문자열
-   * @returns {number} 매칭 점수 (간격 합계, 낮을수록 좋음)
-   * 
-   * @example
-   * // "고양이" vs "강오의" 비교
-   * getMatchScore("ㄱㅇㅣ", "ㄱㅗㅇㅏㅇㅣ")  // 3 (고양이 - 더 좋음!)
-   * getMatchScore("ㄱㅇㅣ", "ㄱㅏㅇㅗㅇㅡㅣ") // 4 (강오의)
-   */
-  getMatchScore(input, target) {
-    let inputIndex = 0;
-    let targetIndex = 0;
-    let totalGap = 0;
-    let lastMatchPos = -1;
-
-    while (inputIndex < input.length && targetIndex < target.length) {
-      if (input[inputIndex] === target[targetIndex]) {
-        if (lastMatchPos >= 0) {
-          // 이전 매칭 위치와 현재 위치 사이의 간격 누적
-          totalGap += (targetIndex - lastMatchPos - 1);
-        }
-        lastMatchPos = targetIndex;
-        inputIndex++;
-      }
-      targetIndex++;
-    }
-
-    return totalGap;
-  }
-
-
   updateHighlight(allowAutoSelect = true) {
     this.clearHighlight();
 
@@ -1254,7 +1087,7 @@ class DuolingoKoreanQuickSelect {
         let bestKoreanMatch = null;
 
         variants.forEach((variant, index) => {
-          const result = this.evaluateKoreanMatch(this.currentInput, variant, index !== 0);
+          const result = evaluateKoreanMatch(this.currentInput, variant, index !== 0);
           if (!result) return;
 
           if (!bestKoreanMatch || result.score < bestKoreanMatch.score) {
@@ -1270,7 +1103,7 @@ class DuolingoKoreanQuickSelect {
 
       } else if ((isOrderTapComplete || hasQuotedEnglish) && lang === 'en') {
         // 영어 매칭: 알파벳만 추출해서 prefix 매칭 (따옴표 무시)
-        const engResult = this.evaluateEnglishMatch(this.currentInput, text);
+        const engResult = evaluateEnglishMatch(this.currentInput, text);
         if (engResult.isMatch) {
           isMatch = true;
           isExactMatch = engResult.isExactMatch;
