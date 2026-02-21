@@ -542,6 +542,89 @@ class DuolingoKoreanQuickSelect {
     }
   }
 
+  /** stories/page-wide 컨테이너 fallback 탐색 (challenge-match 이후 단계) */
+  _findMatchContainer() {
+    const storiesMatchContainer = document.querySelector('.NG0lu') ||
+      document.querySelector('._3dO1K');
+    if (storiesMatchContainer) {
+      const storiesButtons = Array.from(storiesMatchContainer.querySelectorAll('button[data-test*="-challenge-tap-token"]'));
+      if (storiesButtons.length > 0) {
+        console.log(`🔍 [STORIES-MATCH] 스토리 매치 컨테이너 발견, 버튼 ${storiesButtons.length}개`);
+        return storiesMatchContainer;
+      }
+    }
+
+    const anyMatchButtons = document.querySelectorAll('button[data-test*="-challenge-tap-token"]');
+    if (anyMatchButtons.length > 0) {
+      console.log(`🔍 [STORIES-MATCH] 페이지 전체에서 버튼 ${anyMatchButtons.length}개 발견`);
+      return document.body;
+    }
+
+    return null;
+  }
+
+  /** span._3zbIX 번호 → 버튼 맵 빌드 */
+  _buildNumberedButtonMap(allButtons) {
+    const buttonNumberMap = {};
+    allButtons.forEach(button => {
+      const numberSpan = button.querySelector('span._3zbIX, span[class*="_3zbIX"]');
+      if (numberSpan) {
+        buttonNumberMap[numberSpan.textContent.trim()] = button;
+      }
+    });
+    console.log(`🔍 [MATCH] 버튼 번호 발견:`, Object.keys(buttonNumberMap).sort());
+    return buttonNumberMap;
+  }
+
+  /** 숫자 span 있는 일반 Match 챌린지 keyMap 빌드 */
+  _buildNumberedKeyMap(buttonNumberMap) {
+    const keyMap = {};
+
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9'].forEach(num => {
+      if (buttonNumberMap[num]) keyMap[num] = buttonNumberMap[num];
+    });
+    if (buttonNumberMap['0']) keyMap['0'] = buttonNumberMap['0'];
+
+    Object.keys(this.keyBindings.match.alternates).forEach(altKey => {
+      const targetButtonNumber = this.keyBindings.match.alternates[altKey];
+      const displayNumber = targetButtonNumber === 10 ? '0' : String(targetButtonNumber);
+      if (buttonNumberMap[displayNumber]) keyMap[altKey] = buttonNumberMap[displayNumber];
+    });
+
+    return keyMap;
+  }
+
+  /** 숫자 span 없을 때 DOM 순서 기반 keyMap 빌드 (storiesMatch) */
+  _buildDomOrderKeyMap(allButtons, matchContainer) {
+    const keyMap = {};
+    const columns = matchContainer.querySelectorAll('ul');
+    let leftButtons = [];
+    let rightButtons = [];
+
+    if (columns.length >= 2) {
+      leftButtons = Array.from(columns[0].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
+      rightButtons = Array.from(columns[1].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
+      console.log(`🔍 [STORIES-MATCH] 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
+    } else {
+      const half = Math.ceil(allButtons.length / 2);
+      leftButtons = allButtons.slice(0, half);
+      rightButtons = allButtons.slice(half);
+      console.log(`🔍 [STORIES-MATCH] ul 없음 - 반으로 나눔: 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
+    }
+
+    leftButtons.forEach((btn, i) => { if (i < 5) keyMap[String(i + 1)] = btn; });
+    rightButtons.forEach((btn, i) => {
+      if (i < 4) keyMap[String(i + 6)] = btn;
+      else if (i === 4) keyMap['0'] = btn;
+    });
+
+    const altKeys = ['q', 'w', 'e', 'r', 't'];
+    rightButtons.forEach((btn, i) => { if (i < altKeys.length) keyMap[altKeys[i]] = btn; });
+
+    console.log(`🔍 [STORIES-MATCH] keyMap 키:`, Object.keys(keyMap));
+    return keyMap;
+  }
+
   /**
    * Match 챌린지 단축키 처리
    * @param {Event} event - 키보드 이벤트
@@ -549,38 +632,17 @@ class DuolingoKoreanQuickSelect {
    * @returns {boolean} 처리했으면 true
    */
   handleMatchChallenge(event, key) {
-    // 컨테이너 찾기 순서: --match-challenge-rows → challenge-match → stories-element
+    // 컨테이너 찾기 순서: --match-challenge-rows → challenge-match(fallback) → stories/page-wide
     let matchContainer = document.querySelector('[style*="--match-challenge-rows"]');
 
     if (!matchContainer) {
-      // Fallback: 기존 방식
       const fallbackContainer = document.querySelector('[data-test*="challenge-match"]');
       if (fallbackContainer) {
         return this.handleMatchChallengeFallback(fallbackContainer, event, key);
       }
-
-      // 스토리 모드 fallback: NG0lu 또는 _3dO1K 컨테이너에서 버튼 찾기
-      const storiesMatchContainer = document.querySelector('.NG0lu') ||
-        document.querySelector('._3dO1K');
-      if (storiesMatchContainer) {
-        const storiesButtons = Array.from(storiesMatchContainer.querySelectorAll('button[data-test*="-challenge-tap-token"]'));
-        if (storiesButtons.length > 0) {
-          console.log(`🔍 [STORIES-MATCH] 스토리 매치 컨테이너 발견, 버튼 ${storiesButtons.length}개`);
-          matchContainer = storiesMatchContainer;
-        }
-      }
-
-      // 마지막 fallback: 전체 페이지에서 버튼 찾기
-      if (!matchContainer) {
-        const anyMatchButtons = document.querySelectorAll('button[data-test*="-challenge-tap-token"]');
-        if (anyMatchButtons.length > 0) {
-          console.log(`🔍 [STORIES-MATCH] 페이지 전체에서 버튼 ${anyMatchButtons.length}개 발견`);
-          matchContainer = document.body;
-        }
-      }
+      matchContainer = this._findMatchContainer();
     }
 
-    // matchContainer가 없으면 return false
     if (!matchContainer) {
       console.log('⚠️ [STORIES-MATCH] 매치 컨테이너를 찾을 수 없음');
       return false;
@@ -589,7 +651,6 @@ class DuolingoKoreanQuickSelect {
     // 모든 버튼 찾기 (🚨 *= 사용: "to call" 같은 다중 단어 버튼도 찾기 위해)
     const allButtons = Array.from(matchContainer.querySelectorAll('button[data-test*="-challenge-tap-token"]'));
     if (allButtons.length === 0) {
-      // 버튼이 없으면 fallback 시도
       const fallbackContainer = document.querySelector('[data-test*="challenge-match"]');
       if (fallbackContainer) {
         return this.handleMatchChallengeFallback(fallbackContainer, event, key);
@@ -597,116 +658,23 @@ class DuolingoKoreanQuickSelect {
       return false;
     }
 
-    // 🎯 핵심: 각 버튼에서 번호 추출 (span._3zbIX 안의 텍스트)
-    const buttonNumberMap = {}; // { '1': button1, '2': button2, ..., '0': button10 }
-
-    allButtons.forEach(button => {
-      const numberSpan = button.querySelector('span._3zbIX, span[class*="_3zbIX"]');
-      if (numberSpan) {
-        const displayNumber = numberSpan.textContent.trim(); // "1", "2", ..., "0"
-        buttonNumberMap[displayNumber] = button;
-      }
-    });
-
-    // 디버그: 찾은 버튼 번호들 출력
-    console.log(`🔍 [MATCH] 버튼 번호 발견:`, Object.keys(buttonNumberMap).sort());
-
-    // 키 매핑 테이블 생성
-    const keyMap = {};
-
-    // 🚨 Stories Match fallback: 숫자 span이 없으면 DOM 순서 기반 매핑
+    const buttonNumberMap = this._buildNumberedButtonMap(allButtons);
+    let keyMap;
     if (Object.keys(buttonNumberMap).length === 0) {
       console.log(`🔍 [STORIES-MATCH] 숫자 span 없음 - DOM 순서 기반 매핑 사용`);
-
-      // ul 요소로 좌/우 열 구분
-      const columns = matchContainer.querySelectorAll('ul');
-      let leftButtons = [];
-      let rightButtons = [];
-
-      if (columns.length >= 2) {
-        leftButtons = Array.from(columns[0].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
-        rightButtons = Array.from(columns[1].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
-        console.log(`🔍 [STORIES-MATCH] 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
-      } else {
-        // ul 구조가 없으면 전체 버튼을 반으로 나눔
-        const half = Math.ceil(allButtons.length / 2);
-        leftButtons = allButtons.slice(0, half);
-        rightButtons = allButtons.slice(half);
-        console.log(`🔍 [STORIES-MATCH] ul 없음 - 반으로 나눔: 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
-      }
-
-      // 왼쪽 열: 1-5번 키
-      leftButtons.forEach((btn, i) => {
-        if (i < 5) {
-          keyMap[String(i + 1)] = btn;
-        }
-      });
-
-      // 오른쪽 열: 6-9, 0번 키
-      rightButtons.forEach((btn, i) => {
-        if (i < 4) {
-          keyMap[String(i + 6)] = btn;
-        } else if (i === 4) {
-          keyMap['0'] = btn;
-        }
-      });
-
-      // alternates: q, w, e, r, t → 오른쪽 열
-      const altKeys = ['q', 'w', 'e', 'r', 't'];
-      rightButtons.forEach((btn, i) => {
-        if (i < altKeys.length) {
-          keyMap[altKeys[i]] = btn;
-        }
-      });
-
-      console.log(`🔍 [STORIES-MATCH] keyMap 키:`, Object.keys(keyMap));
+      keyMap = this._buildDomOrderKeyMap(allButtons, matchContainer);
     } else {
-      // 숫자 span이 있는 일반 Match 챌린지
-      // 1-5번 키: 왼쪽 열 (화면 번호 그대로 매핑)
-      ['1', '2', '3', '4', '5'].forEach(num => {
-        if (buttonNumberMap[num]) {
-          keyMap[num] = buttonNumberMap[num];
-        }
-      });
-
-      // 6-9번 키: 오른쪽 열 (화면 번호 그대로 매핑)
-      ['6', '7', '8', '9'].forEach(num => {
-        if (buttonNumberMap[num]) {
-          keyMap[num] = buttonNumberMap[num];
-        }
-      });
-
-      // 0번 키: 10번째 버튼 (화면에는 "0"으로 표시됨)
-      if (buttonNumberMap['0']) {
-        keyMap['0'] = buttonNumberMap['0'];
-      }
-
-      // alternates: q, w, e, r, t → 6, 7, 8, 9, 0번 버튼
-      Object.keys(this.keyBindings.match.alternates).forEach(altKey => {
-        const targetButtonNumber = this.keyBindings.match.alternates[altKey]; // 6, 7, 8, 9, 10
-        // 10은 화면에서 "0"으로 표시됨
-        const displayNumber = targetButtonNumber === 10 ? '0' : String(targetButtonNumber);
-
-        if (buttonNumberMap[displayNumber]) {
-          keyMap[altKey] = buttonNumberMap[displayNumber];
-        }
-      });
+      keyMap = this._buildNumberedKeyMap(buttonNumberMap);
     }
 
-    // 키 입력 처리
     if (keyMap.hasOwnProperty(key.toLowerCase())) {
       const targetButton = keyMap[key.toLowerCase()];
       if (targetButton) {
-        // 화면 번호 역추출 (로그용)
         const numberSpan = targetButton.querySelector('span._3zbIX, span[class*="_3zbIX"]');
         const displayNumber = numberSpan ? numberSpan.textContent.trim() : '?';
-
         console.log(`🔗 짝짓기 선택: "${key}" → 화면 번호 ${displayNumber}번 버튼`);
         targetButton.click();
-
-        // 시각적 피드백
         this.applyClickFeedback(targetButton);
-
         event.preventDefault();
         event.stopPropagation();
         return true;
@@ -1386,6 +1354,20 @@ class DuolingoKoreanQuickSelect {
     this.updateInputDisplay();
   }
 
+  _isButtonVisible(button) {
+    if (button.offsetParent === null) return false;
+    const style = window.getComputedStyle(button);
+    return button.textContent.trim() !== '' && style.opacity !== '0' && style.visibility !== 'hidden';
+  }
+
+  _isButtonDisabled(button) {
+    return button.getAttribute('aria-disabled') === 'true' || button.classList.contains('disabled');
+  }
+
+  _getButtonLanguage(button) {
+    return button.getAttribute('lang');
+  }
+
   getWordButtons() {
     let buttons = [];
     const wordBank = document.querySelector('[data-test="word-bank"]');
@@ -1403,24 +1385,16 @@ class DuolingoKoreanQuickSelect {
     const isOrderTapComplete = challengeType === 'orderTapComplete';
 
     const validButtons = Array.from(buttons).filter(button => {
-      // 화면에 보이지 않는 버튼 제외 (중복 감지 방지)
-      if (button.offsetParent === null) return false;
+      // 화면에 보이지 않는 버튼 제외 (중복 감지 방지, 유령 버튼 포함)
+      if (!this._isButtonVisible(button)) return false;
 
       // 단어 은행 내부에 있는지 이중 확인 (쿼리 셀렉터가 정확하다면 불필요할 수 있으나 안전장치)
       if (wordBank && !wordBank.contains(button)) return false;
 
       // 이미 사용된 버튼(비활성화) 제외
-      if (button.getAttribute('aria-disabled') === 'true' || button.classList.contains('disabled')) {
-        return false;
-      }
+      if (this._isButtonDisabled(button)) return false;
 
-      // 유령 버튼(빈 텍스트, 투명 버튼) 제외 - 추가된 필터링
-      const style = window.getComputedStyle(button);
-      if (button.textContent.trim() === '' || style.opacity === '0' || style.visibility === 'hidden') {
-        return false;
-      }
-
-      const lang = button.getAttribute('lang');
+      const lang = this._getButtonLanguage(button);
       const text = button.textContent;
       const hasKorean = /[가-힣]/.test(text);
       const hasEnglish = /[a-zA-Z]/.test(text);
