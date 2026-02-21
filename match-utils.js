@@ -1,7 +1,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // DOM 유틸 + Match 챌린지 순수 함수 모음
 // content.js와 같은 전역 스코프에서 실행됨 (MV3 content script 공유 스코프)
-// 의존: 없음 (순수 DOM 조작)
+// 의존: constants.js (SEL)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /**
@@ -24,11 +24,11 @@ function detectChallengeType() {
   // Stories 모드 매칭 챌린지 (match보다 먼저 체크 - 더 구체적)
   // 🚨 수정: 페이지 전체에서 stories-element와 매치 버튼을 확인
   const storiesElements = document.querySelectorAll('[data-test="stories-element"]');
-  const hasStoriesMatchButtons = document.querySelector('button[data-test*="-challenge-tap-token"]');
+  const hasStoriesMatchButtons = document.querySelector(SEL.TAP_TOKEN);
   if (storiesElements.length > 0 && hasStoriesMatchButtons) {
     // 버튼이 stories-element 컨텍스트 내에 있는지 확인 (NG0lu 클래스는 매치 컨테이너)
-    const matchContainer = document.querySelector('.NG0lu button[data-test*="-challenge-tap-token"]') ||
-      document.querySelector('._3dO1K button[data-test*="-challenge-tap-token"]');
+    const matchContainer = document.querySelector('.NG0lu ' + SEL.TAP_TOKEN) ||
+      document.querySelector('._3dO1K ' + SEL.TAP_TOKEN);
     if (matchContainer) {
       console.log('🔍 [DETECT] storiesMatch 감지됨');
       return 'storiesMatch';
@@ -36,15 +36,15 @@ function detectChallengeType() {
   }
 
   // Match 챌린지 (일반)
-  if (document.querySelector('[data-test*="challenge-match"]')) return 'match';
-  if (document.querySelector('[data-test*="challenge-listenMatch"]')) return 'listenMatch';
+  if (document.querySelector(SEL.CHALLENGE_MATCH)) return 'match';
+  if (document.querySelector(SEL.LISTEN_MATCH)) return 'listenMatch';
 
   // ListenIsolation 챌린지 (듣고 선택하기 - 선택지에 스피커 포함)
   // challenge-listen보다 먼저 체크 (더 구체적)
-  if (document.querySelector('[data-test*="challenge-listenIsolation"]')) return 'listenIsolation';
+  if (document.querySelector(SEL.LISTEN_ISO)) return 'listenIsolation';
 
   // Stories 챌린지 (객관식)
-  if (document.querySelector('button[data-test="stories-choice"]')) return 'stories';
+  if (document.querySelector(SEL.STORIES_CHOICE)) return 'stories';
 
   // 타이핑이 필요한 챌린지 추가
   if (document.querySelector('[data-test*="challenge-listen"]')) return 'listen';
@@ -77,7 +77,7 @@ function findTopSpeakerButton(challengeContainer) {
     if (['player-next', 'player-skip', 'quit-button'].some(t => testAttr.includes(t))) return false;
 
     // 단어 은행 및 탭 토큰 제외
-    if (btn.closest('[data-test="word-bank"]')) return false;
+    if (btn.closest(SEL.WORD_BANK)) return false;
     if (testAttr.includes('challenge-tap-token')) return false;
 
     // 🚨 중요: challenge-choice 내부의 버튼 제외 (선택지 내부 스피커)
@@ -102,14 +102,14 @@ function findMatchContainer() {
   const storiesMatchContainer = document.querySelector('.NG0lu') ||
     document.querySelector('._3dO1K');
   if (storiesMatchContainer) {
-    const storiesButtons = Array.from(storiesMatchContainer.querySelectorAll('button[data-test*="-challenge-tap-token"]'));
+    const storiesButtons = Array.from(storiesMatchContainer.querySelectorAll(SEL.TAP_TOKEN));
     if (storiesButtons.length > 0) {
       console.log(`🔍 [STORIES-MATCH] 스토리 매치 컨테이너 발견, 버튼 ${storiesButtons.length}개`);
       return storiesMatchContainer;
     }
   }
 
-  const anyMatchButtons = document.querySelectorAll('button[data-test*="-challenge-tap-token"]');
+  const anyMatchButtons = document.querySelectorAll(SEL.TAP_TOKEN);
   if (anyMatchButtons.length > 0) {
     console.log(`🔍 [STORIES-MATCH] 페이지 전체에서 버튼 ${anyMatchButtons.length}개 발견`);
     return document.body;
@@ -161,8 +161,8 @@ function buildDomOrderKeyMap(allButtons, matchContainer) {
   let rightButtons = [];
 
   if (columns.length >= 2) {
-    leftButtons = Array.from(columns[0].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
-    rightButtons = Array.from(columns[1].querySelectorAll('button[data-test*="-challenge-tap-token"]'));
+    leftButtons = Array.from(columns[0].querySelectorAll(SEL.TAP_TOKEN));
+    rightButtons = Array.from(columns[1].querySelectorAll(SEL.TAP_TOKEN));
     console.log(`🔍 [STORIES-MATCH] 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
   } else {
     const half = Math.ceil(allButtons.length / 2);
@@ -189,9 +189,7 @@ function buildDomOrderKeyMap(allButtons, matchContainer) {
  * @returns {boolean}
  */
 function hasQuotedEnglishWords() {
-  // 🚨 getWordButtons() 호출하면 안 됨! (그 함수가 여기를 간접 참조함)
-  // 직접 word-bank에서 버튼 조회
-  const wordBank = document.querySelector('[data-test="word-bank"]');
+  const wordBank = document.querySelector(SEL.WORD_BANK);
   if (!wordBank) return false;
 
   const buttons = wordBank.querySelectorAll('button');
@@ -209,7 +207,7 @@ function hasQuotedEnglishWords() {
  * @returns {boolean} 영어 단어가 있으면 true
  */
 function hasEnglishWordsInBank() {
-  const wordBank = document.querySelector('[data-test="word-bank"]');
+  const wordBank = document.querySelector(SEL.WORD_BANK);
   if (!wordBank) return false;
 
   const buttons = wordBank.querySelectorAll('button');

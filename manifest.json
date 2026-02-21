@@ -20,6 +20,7 @@
         "https://*.duolingo.com/*"
       ],
       "js": [
+        "constants.js",
         "hangul.js",
         "korean-matcher.js",
         "match-utils.js",
