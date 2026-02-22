@@ -11,101 +11,11 @@ class DuolingoKoreanQuickSelect {
       lastInput: ''
     };
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ⚙️ 키 바인딩 설정 (커스터마이징 가능)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    this.keyBindings = {
-      // 글로벌 단축키
-      global: {
-        escape: 'Escape',
-        backspace: 'Backspace',
-        delete: 'Delete'
-      },
-
-      // 오디오 단축키
-      audio: {
-        normal: '1',    // 일반 속도
-        slow: '2'       // 느린 속도
-      },
-
-      // Match 챌린지 (짝짓기)
-      match: {
-        buttons: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
-        // alternates: 화면 버튼 번호(1-based)로 지정 (사용 시 -1 해서 인덱스로 변환)
-        // 예: 'q': 6 → 6번 버튼 → buttons[5]
-        alternates: {
-          'q': 6,  // 6번 버튼
-          'w': 7,  // 7번 버튼
-          'e': 8,  // 8번 버튼
-          'r': 9,  // 9번 버튼
-          't': 10  // 0번 키 (듀오링고에서 0은 10번째 버튼)
-        }
-      },
-
-      // Listen Match 챌린지 (듣기 짝짓기)
-      listenMatch: {
-        buttons: ['1', '2', '3', '4', '5', '6', '7', '8'],
-        // alternates: 화면 버튼 번호(1-based)로 지정 (사용 시 -1 해서 인덱스로 변환)
-        // 예: 'q': 5 → 5번 버튼 → buttons[4]
-        alternates: {
-          'q': 5,  // 5번 버튼
-          'w': 6,  // 6번 버튼
-          'e': 7,  // 7번 버튼
-          'r': 8   // 8번 버튼
-        }
-      },
-
-      // Stories 챌린지 (스토리 객관식)
-      stories: {
-        buttons: ['1', '2', '3']
-      },
-
-      // 한글 입력
-      korean: {
-        enter: 'Enter',
-        enabled: true
-      }
-    };
+    // ⚙️ 키 바인딩 설정 — constants.js의 DEFAULT_KEY_BINDINGS 참조
+    this.keyBindings = DEFAULT_KEY_BINDINGS;
 
     // Korean synonym groups (bidirectional), applied only to Korean-word matching.
-    this.koreanSynonymGroups = [
-      ['우리', '저희'],
-      ['우리는', '저희는', '우린', '저흰'],
-      ['우리가', '저희가'],
-      ['우리를', '저희를', '우릴', '저흴'],
-      ['우리의', '저희의'],
-      ['우리도', '저희도'],
-
-      ['나', '저'],
-      ['나는', '저는', '난', '전'],
-      ['내가', '제가'],
-      ['나를', '저를'],
-      ['나의', '저의'],
-      ['나도', '저도'],
-      ['내', '제'],
-
-      ['너', '당신'],
-      ['너는', '당신은', '넌'],
-      ['네가', '당신이'],
-      ['너를', '당신을'],
-      ['너의', '당신의'],
-      ['너도', '당신도'],
-
-      ['너희', '당신들'],
-      ['너희는', '당신들은'],
-      ['너희가', '당신들이'],
-      ['너희를', '당신들을'],
-      ['너희의', '당신들의'],
-      ['너희도', '당신들도'],
-
-      ['이거', '이것'],
-      ['그거', '그것'],
-      ['저거', '저것'],
-
-      ['뭐', '무엇'],
-      ['뭘', '무엇을'],
-      ['뭐가', '무엇이']
-    ];
+    this.koreanSynonymGroups = SYNONYM_GROUPS;
     this.koreanSynonymMap = buildSynonymMap(this.koreanSynonymGroups);
 
     console.log('🎯 Duolingo Korean Quick Select 초기화 중...');
@@ -1044,25 +954,7 @@ class DuolingoKoreanQuickSelect {
 
     // ✅ orderTapComplete 챌린지 특수 처리
     if (challengeType === 'orderTapComplete') {
-      // "Selected gap" 영역 찾기 (실제로 사용자가 선택한 단어들이 여기 있음)
-      const selectedGap = document.querySelector(SEL.SELECTED_GAP);
-
-      if (!selectedGap) {
-        console.log(`🔍 [DEBUG] Selected gap 없음 (아직 아무것도 선택 안 함)`);
-        return [];
-      }
-
-      // Selected gap 안의 버튼들만 반환 (이게 진짜 선택된 버튼들)
-      const selectedButtons = Array.from(
-        selectedGap.querySelectorAll('button' + SEL.TAP_TOKEN_ANY)
-      ).filter(btn => btn.offsetParent !== null);
-
-      console.log(`🔍 [DEBUG] Selected gap 안의 버튼: ${selectedButtons.length}개`);
-      selectedButtons.forEach(btn => {
-        console.log(`   ✓ "${btn.textContent.trim()}" (${btn.getAttribute('data-test')})`);
-      });
-
-      return selectedButtons;
+      return this._getPlacedButtonsOrderTap();
     }
 
     // ✅ 다른 챌린지: 기존 로직 (word-bank 밖의 버튼)
@@ -1096,6 +988,29 @@ class DuolingoKoreanQuickSelect {
 
     console.log(`🔍 [DEBUG] getPlacedButtons 결과: ${uniqueButtons.length}개 (중복 제거 전: ${placedButtons.length}개)`);
     return uniqueButtons;
+  }
+
+  // orderTapComplete 챌린지 전용: Selected gap 안의 버튼 반환
+  _getPlacedButtonsOrderTap() {
+    // "Selected gap" 영역 찾기 (실제로 사용자가 선택한 단어들이 여기 있음)
+    const selectedGap = document.querySelector(SEL.SELECTED_GAP);
+
+    if (!selectedGap) {
+      console.log(`🔍 [DEBUG] Selected gap 없음 (아직 아무것도 선택 안 함)`);
+      return [];
+    }
+
+    // Selected gap 안의 버튼들만 반환 (이게 진짜 선택된 버튼들)
+    const selectedButtons = Array.from(
+      selectedGap.querySelectorAll('button' + SEL.TAP_TOKEN_ANY)
+    ).filter(btn => btn.offsetParent !== null);
+
+    console.log(`🔍 [DEBUG] Selected gap 안의 버튼: ${selectedButtons.length}개`);
+    selectedButtons.forEach(btn => {
+      console.log(`   ✓ "${btn.textContent.trim()}" (${btn.getAttribute('data-test')})`);
+    });
+
+    return selectedButtons;
   }
 }
 
