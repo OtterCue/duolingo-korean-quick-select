@@ -1,3 +1,6 @@
+// 개발 모드 플래그 (프로덕션 배포 시 false, 디버깅 시 true로 변경)
+const DEV = false;
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 공통 상수 (DOM 셀렉터, CSS 클래스명, 정규식)
 // content.js와 같은 전역 스코프에서 실행됨 (MV3 content script 공유 스코프)
@@ -21,6 +24,9 @@ const SEL = {
   PLAYER_SKIP:    'button[data-test="player-skip"]',
   LEGENDARY_CONT: 'button[data-test="legendary-session-end-continue"]',
   SELECTED_GAP:   '[aria-label="Selected gap"]',
+  MATCH_CONT_A:  '.NG0lu',   // Duolingo 난독화 stories match 컨테이너 (변형 A)
+  MATCH_CONT_B:  '._3dO1K',  // Duolingo 난독화 stories match 컨테이너 (변형 B)
+  NUM_SPAN:      'span._3zbIX, span[class*="_3zbIX"]',  // 버튼 번호 표시 span
 };
 
 // CSS 클래스명

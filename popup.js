@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // content script에 메시지 보내서 상태 요청
       chrome.tabs.sendMessage(currentTab.id, { action: 'getStatus' }, function(response) {
         if (chrome.runtime.lastError) {
-          console.log('Content script not ready:', chrome.runtime.lastError);
+          console.warn('Content script not ready:', chrome.runtime.lastError);
           return;
         }
         

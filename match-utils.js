@@ -27,10 +27,10 @@ function detectChallengeType() {
   const hasStoriesMatchButtons = document.querySelector(SEL.TAP_TOKEN);
   if (storiesElements.length > 0 && hasStoriesMatchButtons) {
     // 버튼이 stories-element 컨텍스트 내에 있는지 확인 (NG0lu 클래스는 매치 컨테이너)
-    const matchContainer = document.querySelector('.NG0lu ' + SEL.TAP_TOKEN) ||
-      document.querySelector('._3dO1K ' + SEL.TAP_TOKEN);
+    const matchContainer = document.querySelector(SEL.MATCH_CONT_A + ' ' + SEL.TAP_TOKEN) ||
+      document.querySelector(SEL.MATCH_CONT_B + ' ' + SEL.TAP_TOKEN);
     if (matchContainer) {
-      console.log('🔍 [DETECT] storiesMatch 감지됨');
+      DEV && console.log('🔍 [DETECT] storiesMatch 감지됨');
       return 'storiesMatch';
     }
   }
@@ -99,19 +99,19 @@ function findTopSpeakerButton(challengeContainer) {
 
 /** stories/page-wide 컨테이너 fallback 탐색 (challenge-match 이후 단계) */
 function findMatchContainer() {
-  const storiesMatchContainer = document.querySelector('.NG0lu') ||
-    document.querySelector('._3dO1K');
+  const storiesMatchContainer = document.querySelector(SEL.MATCH_CONT_A) ||
+    document.querySelector(SEL.MATCH_CONT_B);
   if (storiesMatchContainer) {
     const storiesButtons = Array.from(storiesMatchContainer.querySelectorAll(SEL.TAP_TOKEN));
     if (storiesButtons.length > 0) {
-      console.log(`🔍 [STORIES-MATCH] 스토리 매치 컨테이너 발견, 버튼 ${storiesButtons.length}개`);
+      DEV && console.log(`🔍 [STORIES-MATCH] 스토리 매치 컨테이너 발견, 버튼 ${storiesButtons.length}개`);
       return storiesMatchContainer;
     }
   }
 
   const anyMatchButtons = document.querySelectorAll(SEL.TAP_TOKEN);
   if (anyMatchButtons.length > 0) {
-    console.log(`🔍 [STORIES-MATCH] 페이지 전체에서 버튼 ${anyMatchButtons.length}개 발견`);
+    DEV && console.log(`🔍 [STORIES-MATCH] 페이지 전체에서 버튼 ${anyMatchButtons.length}개 발견`);
     return document.body;
   }
 
@@ -122,12 +122,12 @@ function findMatchContainer() {
 function buildNumberedButtonMap(allButtons) {
   const buttonNumberMap = {};
   allButtons.forEach(button => {
-    const numberSpan = button.querySelector('span._3zbIX, span[class*="_3zbIX"]');
+    const numberSpan = button.querySelector(SEL.NUM_SPAN);
     if (numberSpan) {
       buttonNumberMap[numberSpan.textContent.trim()] = button;
     }
   });
-  console.log(`🔍 [MATCH] 버튼 번호 발견:`, Object.keys(buttonNumberMap).sort());
+  DEV && console.log(`🔍 [MATCH] 버튼 번호 발견:`, Object.keys(buttonNumberMap).sort());
   return buttonNumberMap;
 }
 
@@ -163,12 +163,12 @@ function buildDomOrderKeyMap(allButtons, matchContainer) {
   if (columns.length >= 2) {
     leftButtons = Array.from(columns[0].querySelectorAll(SEL.TAP_TOKEN));
     rightButtons = Array.from(columns[1].querySelectorAll(SEL.TAP_TOKEN));
-    console.log(`🔍 [STORIES-MATCH] 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
+    DEV && console.log(`🔍 [STORIES-MATCH] 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
   } else {
     const half = Math.ceil(allButtons.length / 2);
     leftButtons = allButtons.slice(0, half);
     rightButtons = allButtons.slice(half);
-    console.log(`🔍 [STORIES-MATCH] ul 없음 - 반으로 나눔: 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
+    DEV && console.log(`🔍 [STORIES-MATCH] ul 없음 - 반으로 나눔: 좌측 ${leftButtons.length}개, 우측 ${rightButtons.length}개`);
   }
 
   leftButtons.forEach((btn, i) => { if (i < 5) keyMap[String(i + 1)] = btn; });
@@ -180,7 +180,7 @@ function buildDomOrderKeyMap(allButtons, matchContainer) {
   const altKeys = ['q', 'w', 'e', 'r', 't'];
   rightButtons.forEach((btn, i) => { if (i < altKeys.length) keyMap[altKeys[i]] = btn; });
 
-  console.log(`🔍 [STORIES-MATCH] keyMap 키:`, Object.keys(keyMap));
+  DEV && console.log(`🔍 [STORIES-MATCH] keyMap 키:`, Object.keys(keyMap));
   return keyMap;
 }
 
